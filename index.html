@@ -797,7 +797,11 @@
   let currentUserEmail = '';
   let currentUserRole = 'guest'; // 'admin' | 'subadmin' | 'player' | 'guest'
   let isAdminVerified = false;
+  let isModeratorVerified = false;
   let manualAuthInProgress = false;
+  function hasPanelAccess() {
+    return isAdminVerified || isModeratorVerified;
+  }
 
   function safeDisplayAlias(rawName) {
     const s = String(rawName || 'Invitado').trim();
@@ -862,6 +866,16 @@
     }
   }
 
+  async function checkIsModeratorUid(uid) {
+    if (!database || !uid) return false;
+    try {
+      const snap = await database.ref(DB_NAMESPACE + '/moderators/' + uid).once('value');
+      return snap.exists() && snap.val() !== false;
+    } catch (e) {
+      return false;
+    }
+  }
+
   // Escritura concurrente segura (.push()) en /securityLogs/$logId
   async function logSecurityEvent(eventType, actor, details) {
     const entry = {
@@ -880,7 +894,7 @@
 
   async function loadSecurityLogsFromDB() {
     securityLogsDB = [];
-    if (!database || !isAdminVerified) return securityLogsDB;
+    if (!database || !hasPanelAccess()) return securityLogsDB;
     try {
       const snap = await database.ref(DB_NAMESPACE + '/securityLogs').limitToLast(50).once('value');
       const list = normalizeMapToList(snap.val()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
@@ -889,7 +903,7 @@
     return securityLogsDB;
   }
 
-  async function syncOwnProfile(user, isAdm) {
+  async function syncOwnProfile(user, isAdm, isMod) {
     if (!user) return null;
     const alias = user.isAnonymous ? 'Invitado' : safeDisplayAlias(user.email || user.displayName || 'Modelo');
     let existing = null;
@@ -903,13 +917,13 @@
       uid: user.uid,
       email: user.email || '',
       alias: (existing && existing.alias) ? existing.alias : alias,
-      role: isAdm ? 'admin' : ((existing && existing.role === 'subadmin') ? 'subadmin' : (user.isAnonymous ? 'guest' : 'player')),
+      role: isAdm ? 'admin' : (isMod ? 'subadmin' : (user.isAnonymous ? 'guest' : 'player')),
       hasGameAccess: (existing && typeof existing.hasGameAccess === 'boolean') ? existing.hasGameAccess : true,
       createdAt: (existing && existing.createdAt) ? existing.createdAt : Date.now(),
       lastLoginAt: Date.now()
     };
     if (database) {
-      database.ref(DB_NAMESPACE + '/profiles/' + user.uid).set(profile).catch((e) => console.error('Firebase DB error (profiles):', e));
+      await database.ref(DB_NAMESPACE + '/profiles/' + user.uid).set(profile).catch((e) => console.error('Firebase DB error (profiles):', e));
     }
     return profile;
   }
@@ -922,7 +936,7 @@
     securityLogsDB.forEach((l) => { if (l && l.uid) knownUids.add(l.uid); });
 
 
-    if (!database || !isAdminVerified) return profilesDB;
+    if (!database || !hasPanelAccess()) return profilesDB;
 
     // 1. Intentar lectura directa de /profiles (si las reglas permiten lectura admin en el nodo padre)
     try {
@@ -1025,7 +1039,7 @@
 
   // Solo admins pueden escribir en /settings/music según las reglas
   function saveSharedMusicToDB(rawUrl) {
-    if (!isAdminVerified || !database) return;
+    if (!hasPanelAccess() || !database) return;
     const payload = {
       driveMusicUrl: rawUrl || '',
       updatedBy: safeDisplayAlias(currentUser || 'Admin'),
@@ -3404,19 +3418,28 @@
     const btnAdm = document.getElementById('btn-admin-panel');
     const btnOut = document.getElementById('btn-logout');
     const dock = document.getElementById('admin-dock');
-    const isAdminOrMod = isAdminVerified || currentUserRole === 'admin' || currentUserRole === 'subadmin';
+    const canManage = hasPanelAccess();
     if (btnAdm) {
       btnAdm.style.display = 'inline-flex';
-      btnAdm.textContent = isAdminOrMod ? '👑 Admin' : '🔑 Admin';
+      btnAdm.textContent = isAdminVerified ? '👑 Admin' : (isModeratorVerified ? '🎧 Mod' : '🔑 Admin');
     }
-    if (dock) dock.classList.toggle('visible', isAdminOrMod);
+    if (dock) dock.classList.toggle('visible', canManage);
     if (btnOut) btnOut.style.display = currentUid ? 'inline-flex' : 'none';
   }
 
   async function openAdminModalTab(tabId) {
-    if (!isAdminVerified) {
+    if (!hasPanelAccess()) {
       document.getElementById('start-modal').classList.remove('hidden');
       return;
+    }
+    const optSub = document.getElementById('adm-opt-subadmin');
+    if (optSub) {
+      optSub.hidden = !isAdminVerified;
+      optSub.disabled = !isAdminVerified;
+    }
+    if (!isAdminVerified) {
+      const roleSel = document.getElementById('adm-new-role');
+      if (roleSel) roleSel.value = 'player';
     }
     await loadBattleHistoryFromDB();
     await loadSecurityLogsFromDB();
@@ -3430,12 +3453,13 @@
     adminModal.classList.remove('hidden');
   }
 
-  async function enterGameSession(userObj, profile, isAdm) {
+  async function enterGameSession(userObj, profile, isAdm, isMod) {
     currentUid = userObj ? userObj.uid : '';
     currentUserEmail = (userObj && userObj.email) ? userObj.email : '';
     currentUser = (profile && profile.alias) ? profile.alias : safeDisplayAlias(currentUserEmail || 'Invitado');
     isAdminVerified = !!isAdm;
-    currentUserRole = isAdm ? 'admin' : (profile ? profile.role : (userObj && userObj.isAnonymous ? 'guest' : 'player'));
+    isModeratorVerified = !isAdm && !!isMod;
+    currentUserRole = isAdm ? 'admin' : (isMod ? 'subadmin' : (userObj && userObj.isAnonymous ? 'guest' : 'player'));
     rememberKnownUid(currentUid);
 
     if (currentUid && !userObj.isAnonymous) {
@@ -3474,13 +3498,14 @@
   async function handleAuthenticatedUser(user, eventTag) {
     if (!user) return;
     const isAdm = await checkIsAdminUid(user.uid);
-    const profile = await syncOwnProfile(user, isAdm);
+    const isMod = isAdm ? false : await checkIsModeratorUid(user.uid);
+    const profile = await syncOwnProfile(user, isAdm, isMod);
     if (profile && profile.hasGameAccess === false && !isAdm) {
       document.getElementById('login-msg').textContent = 'Acceso restringido por administración.';
       if (auth) await auth.signOut().catch(() => {});
       return;
     }
-    await enterGameSession(user, profile, isAdm);
+    await enterGameSession(user, profile, isAdm, isMod);
     if (eventTag) {
       await logSecurityEvent(eventTag, currentUser, 'Ingreso Firebase Auth (' + currentUserRole + ')');
     }
@@ -3599,6 +3624,7 @@
     currentUserEmail = '';
     currentUserRole = 'guest';
     isAdminVerified = false;
+    isModeratorVerified = false;
     state.level = 1;
     state.outfitIndex = 0;
     state.cleared = [false, false, false, false, false];
@@ -3670,14 +3696,18 @@
         act.appendChild(resetBtn);
       }
 
-      if (isAdminVerified && u.uid && u.role !== 'admin') {
+      const canToggleTarget = u.uid && (
+        (isAdminVerified && u.role !== 'admin') ||
+        (isModeratorVerified && u.role === 'player')
+      );
+      if (canToggleTarget) {
         const banBtn = document.createElement('button');
         banBtn.className = 'mini-btn ' + (u.hasGameAccess === false ? 'danger' : '');
         banBtn.textContent = u.hasGameAccess === false ? 'Acceso: 🔒' : 'Acceso: 🔓';
         banBtn.addEventListener('click', async () => {
           u.hasGameAccess = (u.hasGameAccess === false);
           if (database) {
-            await database.ref(DB_NAMESPACE + '/profiles/' + u.uid + '/hasGameAccess').set(u.hasGameAccess).catch(() => {});
+            await database.ref(DB_NAMESPACE + '/profiles/' + u.uid + '/hasGameAccess').set(u.hasGameAccess).catch((e) => console.error('Firebase DB error (access):', e));
           }
           await logSecurityEvent('ACCESS_TOGGLE', currentUser, safeDisplayAlias(u.alias || u.email) + ' -> ' + (u.hasGameAccess ? 'habilitado' : 'restringido'));
           renderAdminUsers();
@@ -3826,49 +3856,73 @@
     });
   });
 
-  // Crear cuenta desde Admin usando instancia secundaria temporal de Firebase (no cierra la sesión Admin)
+  // Crear cuenta desde Admin/Mod usando instancia secundaria temporal con Persistence.NONE
   document.getElementById('btn-adm-create-user').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-adm-create-user');
     const email = (document.getElementById('adm-new-user').value || '').trim();
     const pass = (document.getElementById('adm-new-pass').value || '').trim();
-    const role = document.getElementById('adm-new-role').value;
+    const requestedRole = document.getElementById('adm-new-role').value;
     const msg = document.getElementById('adm-users-msg');
-    if (!email || !email.includes('@') || pass.length < 6) {
-      msg.textContent = 'Ingresa un correo válido y contraseña de al menos 6 caracteres.';
+
+    const setMsg = (txt, color) => {
+      if (!msg) return;
+      msg.textContent = txt;
+      msg.style.color = color || 'var(--emerald-bright)';
+    };
+
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || pass.length < 6) {
+      setMsg('Ingresa un correo válido y contraseña de al menos 6 caracteres.', '#fda4af');
       return;
     }
-    if (typeof firebase === 'undefined' || !database || !isAdminVerified) {
-      msg.textContent = 'Requiere sesión Admin verificada en Firebase.';
+    if (typeof firebase === 'undefined' || !database || !hasPanelAccess()) {
+      setMsg('Requiere sesión de Admin o Moderador verificada en Firebase.', '#fda4af');
       return;
     }
 
-    msg.textContent = 'Creando cuenta en Firebase Auth (instancia secundaria)...';
+    const finalRole = (isAdminVerified && requestedRole === 'subadmin') ? 'subadmin' : 'player';
+
+    btn.disabled = true;
+    btn.textContent = 'Creando...';
+    setMsg('Creando cuenta en Firebase Auth...', '#facc15');
+
     const secName = 'ubc_sec_create_' + Date.now();
     let secApp = null;
     try {
       secApp = firebase.initializeApp(EXTERNAL_DB_CONFIG, secName);
-      const cred = await secApp.auth().createUserWithEmailAndPassword(email, pass);
+      const secAuth = secApp.auth();
+      await secAuth.setPersistence(firebase.auth.Auth.Persistence.NONE);
+      const cred = await secAuth.createUserWithEmailAndPassword(email, pass);
       const newUid = cred.user.uid;
-      await secApp.auth().signOut();
+      await secAuth.signOut().catch(() => {});
+
+      if (finalRole === 'subadmin') {
+        await database.ref(DB_NAMESPACE + '/moderators/' + newUid).set(true);
+      }
+
       const newProfile = {
         uid: newUid,
         email,
         alias: safeDisplayAlias(email),
-        role: role === 'subadmin' ? 'subadmin' : 'player',
+        role: finalRole,
         hasGameAccess: true,
         createdAt: Date.now(),
         lastLoginAt: 0
       };
       await database.ref(DB_NAMESPACE + '/profiles/' + newUid).set(newProfile);
       rememberKnownUid(newUid);
-      await logSecurityEvent('USER_CREATED_AUTH', currentUser, 'Creó cuenta ' + safeDisplayAlias(email) + ' (' + newProfile.role + ')');
+      await logSecurityEvent('USER_CREATED_AUTH', currentUser, 'Creó cuenta ' + safeDisplayAlias(email) + ' (' + finalRole + ')');
+
       document.getElementById('adm-new-user').value = '';
       document.getElementById('adm-new-pass').value = '';
-      msg.textContent = 'Cuenta ' + safeDisplayAlias(email) + ' creada en Firebase Auth sin cerrar tu sesión.';
+      setMsg('Cuenta ' + safeDisplayAlias(email) + ' (' + finalRole + ') creada correctamente.', '#34d399');
       await loadProfilesForAdmin();
       renderAdminUsers();
     } catch (err) {
-      msg.textContent = mapAuthError(err);
+      console.error('Error al crear usuario desde Admin:', err);
+      setMsg('Error: ' + mapAuthError(err), '#fda4af');
     } finally {
+      btn.disabled = false;
+      btn.textContent = '+ Crear Cuenta';
       if (secApp) {
         try { await secApp.delete(); } catch (e) {}
       }
