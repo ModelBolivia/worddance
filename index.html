@@ -10,6 +10,7 @@
 <meta property="og:type" content="website" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <style>
   :root {
@@ -26,6 +27,7 @@
     --muted: #cbd5e1;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+  input, textarea, select { user-select: text; -webkit-user-select: text; }
   html, body {
     width: 100%; height: 100%; overflow: hidden;
     background: var(--bg); color: var(--text);
@@ -628,10 +630,11 @@
       </div>
       <h1>URBAN BEAT CAMBA 3D</h1>
       <div class="login-form">
-        <input type="text" class="music-input" id="login-username" placeholder="Usuario o cuenta Admin" style="margin-bottom:0;" autocomplete="username" />
+        <input type="email" class="music-input" id="login-username" placeholder="Correo electrónico (Firebase Auth)" style="margin-bottom:0;" autocomplete="email" />
         <input type="password" class="music-input" id="login-password" placeholder="Contraseña (mín. 6 caracteres)" style="margin-bottom:0;" autocomplete="current-password" />
         <div class="login-row-chk">
           <label><input type="checkbox" id="chk-remember-session" checked /> Recordar sesión</label>
+          <button type="button" id="btn-forgot-pass" style="background:none; border:none; color:var(--gold); font-size:11px; font-weight:700; cursor:pointer;">¿Olvidaste tu clave?</button>
         </div>
         <div class="login-msg" id="login-msg"></div>
       </div>
@@ -645,7 +648,10 @@
         <button class="couture-opt" data-outfit="5">💎 Morenada</button>
       </div>
       <button class="primary-btn" id="btn-start-game">INGRESAR ▶</button>
-      <button class="secondary-btn" id="btn-guest-login" style="padding:9px 12px; font-size:12px;">⚡ Invitado</button>
+      <div class="music-row" style="margin-bottom:0;">
+        <button class="secondary-btn" id="btn-register-user" style="padding:9px 10px; font-size:12px;">✨ Crear cuenta</button>
+        <button class="secondary-btn" id="btn-guest-login" style="padding:9px 10px; font-size:12px;">⚡ Invitado</button>
+      </div>
     </div>
   </div>
 
@@ -697,7 +703,7 @@
       <!-- TAB 1: USUARIOS Y ROLES -->
       <div class="admin-pane active" id="admin-pane-users">
         <div class="admin-form-grid">
-          <input type="text" class="mini-input" id="adm-new-user" placeholder="Nuevo @usuario o correo" />
+          <input type="text" class="mini-input" id="adm-new-user" placeholder="Correo electrónico nuevo" />
           <input type="password" class="mini-input" id="adm-new-pass" placeholder="Contraseña" />
         </div>
         <div class="music-row" style="margin-bottom:10px;">
@@ -707,7 +713,7 @@
           </select>
           <button class="primary-btn" id="btn-adm-create-user" style="margin:0; padding:7px 10px; font-size:11px;">+ Crear Cuenta</button>
         </div>
-        <div class="music-status" id="adm-users-msg" style="margin-bottom:8px;">Gestiona cuentas, contraseñas y acceso al circuito.</div>
+        <div class="music-status" id="adm-users-msg" style="margin-bottom:8px;">Perfiles Firebase Auth (creación sin cerrar tu sesión + envío oficial de restablecimiento).</div>
         <div class="admin-list" id="adm-users-list"></div>
       </div>
 
@@ -720,40 +726,23 @@
 
       <!-- TAB 3: AUDITORÍA Y SEGURIDAD EN BASE DE DATOS -->
       <div class="admin-pane" id="admin-pane-security">
-        <div class="music-status" id="adm-sec-summary">Registro verificado de accesos y cambios administrativos (SHA-256 activo).</div>
+        <div class="music-status" id="adm-sec-summary">Registro verificado de accesos y cambios administrativos (Firebase Auth activo).</div>
         <div class="admin-list" id="adm-sec-list"></div>
       </div>
 
-      <!-- TAB 4: NUEVA BASE DE DATOS EXTERNA (PROYECTO FIREBASE PROPIO) -->
+      <!-- TAB 4: ESTADO DE FIREBASE REALTIME DATABASE (PRODUCCIÓN) -->
       <div class="admin-pane" id="admin-pane-database">
-        <div class="music-status" id="adm-db-status">Sin credenciales de proyecto nuevo configuradas (usando respaldo local).</div>
-        <div class="admin-form-grid">
-          <input type="text" class="mini-input" id="adm-fb-apikey" placeholder="apiKey de tu nuevo Firebase" />
-          <input type="text" class="mini-input" id="adm-fb-projectid" placeholder="projectId (ej: urban-beat-bo)" />
+        <div class="music-status" id="adm-db-status">🟡 Sin conexión con Firebase</div>
+        <div class="admin-card" style="margin-bottom:10px; font-size:11px; color:var(--muted);">
+          <div><strong style="color:var(--gold);">Proyecto:</strong> wordmodelbolivia-3d-5fa07</div>
+          <div><strong style="color:var(--gold);">Realtime DB:</strong> https://wordmodelbolivia-3d-5fa07-default-rtdb.firebaseio.com</div>
+          <div><strong style="color:var(--gold);">Ruta raíz:</strong> /urban_beat_camba_v1_db (100% Firebase Auth + RTDB)</div>
         </div>
-        <input type="text" class="music-input" id="adm-fb-dburl" placeholder="databaseURL (https://tu-nuevo-proyecto-default-rtdb.firebaseio.com/)" style="margin-bottom:8px;" />
-        <input type="text" class="music-input" id="adm-db-namespace" placeholder="Ruta raíz (ej: urban_beat_camba_db)" style="margin-bottom:8px;" />
         <div class="music-row">
-          <button class="primary-btn" id="btn-adm-save-ns" style="margin:0; padding:9px; font-size:11px;">💾 Conectar Nueva DB</button>
-          <button class="secondary-btn" id="btn-adm-sync-now" style="padding:9px; font-size:11px;">🔄 Sincronizar</button>
+          <button class="primary-btn" id="btn-adm-sync-now" style="margin:0; padding:9px; font-size:11px;">🔄 Sincronizar</button>
+          <button class="secondary-btn" id="btn-adm-export-json" style="padding:9px; font-size:11px;">📋 Descargar JSON</button>
         </div>
-        <button class="secondary-btn" id="btn-adm-export-json" style="padding:9px; font-size:11px;">📋 Descargar Respaldo JSON</button>
       </div>
-    </div>
-  </div>
-
-  <!-- CAMBIO OBLIGATORIO DE CONTRASEÑA INICIAL DE ADMINISTRADOR -->
-  <div class="modal-screen hidden" id="force-pass-modal">
-    <div class="modal-box">
-      <div class="brand-kicker">🔐 Seguridad Obligatoria</div>
-      <h2>CAMBIA TU CONTRASEÑA ADMIN</h2>
-      <p>Por seguridad, debes reemplazar la clave inicial antes de ingresar. La nueva clave se guardará cifrada (SHA-256) en tu base de datos y la clave inicial quedará desactivada.</p>
-      <div class="login-form">
-        <input type="password" class="music-input" id="fp-new-pass" placeholder="Nueva contraseña segura (mín. 8 caracteres)" style="margin-bottom:0;" autocomplete="new-password" />
-        <input type="password" class="music-input" id="fp-confirm-pass" placeholder="Confirmar nueva contraseña" style="margin-bottom:0;" autocomplete="new-password" />
-        <div class="login-msg" id="fp-msg"></div>
-      </div>
-      <button class="primary-btn" id="btn-save-force-pass">GUARDAR NUEVA CLAVE Y ENTRAR 🔐</button>
     </div>
   </div>
 
@@ -781,237 +770,192 @@
   'use strict';
 
   // =========================================================================
-  // 0. BASE DE DATOS EXTERNA FIREBASE REALTIME DB + SEGURIDAD SHA-256 & AUDITORÍA
-  // =========================================================================
-  // =========================================================================
-  // CONFIGURACIÓN DE TU NUEVO PROYECTO FIREBASE INDEPENDIENTE (SEPARADO)
-  // Pega aquí las credenciales de tu NUEVA base de datos Firebase antes de
-  // subir a GitHub Pages, o configúralas desde 👑 Admin -> 🔗 DB Externa.
+  // 0. FIREBASE AUTHENTICATION v8.10.1 + REALTIME DATABASE (REGLAS POR UID)
   // =========================================================================
   let EXTERNAL_DB_CONFIG = {
-    apiKey: "",
-    authDomain: "",
-    databaseURL: "",
-    projectId: "",
-    storageBucket: "",
-    messagingSenderId: "",
-    appId: ""
+    apiKey: "AIzaSyCcB0dx0AOGixxQ9K7cPiRxJFJ8kz6aJzg",
+    authDomain: "wordmodelbolivia-3d-5fa07.firebaseapp.com",
+    databaseURL: "https://wordmodelbolivia-3d-5fa07-default-rtdb.firebaseio.com",
+    projectId: "wordmodelbolivia-3d-5fa07",
+    storageBucket: "wordmodelbolivia-3d-5fa07.firebasestorage.app",
+    messagingSenderId: "30482044656",
+    appId: "1:30482044656:web:52d709fd5ddd3742e15435"
   };
 
-  // Cargar credenciales guardadas desde el panel Admin si existen
-  try {
-    const savedCfg = JSON.parse(localStorage.getItem('ubc_custom_fb_config') || 'null');
-    if (savedCfg && savedCfg.databaseURL && savedCfg.apiKey) {
-      EXTERNAL_DB_CONFIG = Object.assign(EXTERNAL_DB_CONFIG, savedCfg);
-    }
-  } catch (e) {}
+  let DB_NAMESPACE = 'urban_beat_camba_v1_db';
 
+  let fbApp = null;
+  let auth = null;
   let database = null;
   let dbConnected = false;
 
-  function initExternalFirebase() {
-    database = null;
-    dbConnected = false;
-    if (typeof firebase === 'undefined' || !EXTERNAL_DB_CONFIG.databaseURL || !EXTERNAL_DB_CONFIG.apiKey) {
-      setDbBadge(false, 'Proyecto Firebase nuevo pendiente de credenciales (respaldo local activo)');
-      return false;
-    }
-    try {
-      const appName = 'ubc_ext_' + Date.now();
-      const app = firebase.initializeApp(EXTERNAL_DB_CONFIG, appName);
-      database = app.database();
-      database.ref('.info/connected').on('value', (snap) => {
-        const isLive = snap.val() === true;
-        setDbBadge(isLive, isLive ? ('🟢 Conectado a ' + (EXTERNAL_DB_CONFIG.projectId || 'Firebase')) : '🟡 Sin conexión externa (Respaldo Local)');
-      });
-      return true;
-    } catch (e) {
-      setDbBadge(false, 'Error al conectar credenciales Firebase (revisa databaseURL y apiKey)');
-      return false;
-    }
-  }
-  let DB_NAMESPACE = 'urban_beat_camba_v1_db';
-  try {
-    DB_NAMESPACE = localStorage.getItem('ubc_db_namespace') || 'urban_beat_camba_v1_db';
-  } catch (e) {}
-
-  initExternalFirebase();
-
-  const SUPER_ADMIN_EMAIL = 'copauyunifreddy@gmail.com';
-  const BOOTSTRAP_SALT = 'ubc2026_boot_9f3a7c';
-  const BOOTSTRAP_SHA256 = '5d333455251c0583e65a48bb541858a3d5389d0de87462e83630c6fc9e037e45';
-  const BOOTSTRAP_FALLBACK = 'af44ba0b5f0d4ec1';
-
-  let usersDB = [];
+  let profilesDB = [];
   let battleHistoryDB = [];
-  let pendingForcePassUser = null;
   let securityLogsDB = [];
+  let currentUid = '';
   let currentUser = '';
+  let currentUserEmail = '';
   let currentUserRole = 'guest'; // 'admin' | 'subadmin' | 'player' | 'guest'
-  let failedLoginCount = 0;
-  let loginLockUntil = 0;
-
-  function sanitizeKey(str) {
-    return String(str || 'guest').toLowerCase().replace(/[.#$[\]\/\s]/g, '_');
-  }
+  let isAdminVerified = false;
+  let manualAuthInProgress = false;
 
   function safeDisplayAlias(rawName) {
     const s = String(rawName || 'Invitado').trim();
     if (s.includes('@') && s.indexOf('@') > 0) {
-      // Nunca exponer correos completos en pantalla durante transmisiones
       return '@' + s.split('@')[0].slice(0, 14);
     }
     return s.slice(0, 18);
   }
 
-  function normalizeList(raw) {
+  function normalizeMapToList(raw) {
     if (!raw) return [];
-    return Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
-  }
-
-  function generateSalt() {
-    const arr = new Uint8Array(12);
-    if (window.crypto && window.crypto.getRandomValues) {
-      window.crypto.getRandomValues(arr);
-    } else {
-      for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
-    }
-    return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  // Hash criptográfico SHA-256 con salt (nunca se guardan contraseñas en texto plano)
-  async function hashPassword(plain, salt) {
-    const input = String(salt) + '::UBC2026::' + String(plain);
-    if (window.crypto && window.crypto.subtle) {
-      const data = new TextEncoder().encode(input);
-      const buf = await window.crypto.subtle.digest('SHA-256', data);
-      return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
-    }
-    // Respaldo determinístico seguro para WebViews sin contexto HTTPS
-    let h1 = 0xdeadbeef ^ input.length, h2 = 0x41c6ce57 ^ input.length;
-    for (let i = 0; i < input.length; i++) {
-      const ch = input.charCodeAt(i);
-      h1 = Math.imul(h1 ^ ch, 2654435761);
-      h2 = Math.imul(h2 ^ ch, 1597334677);
-    }
-    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-    return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+    if (Array.isArray(raw)) return raw.filter(Boolean);
+    return Object.keys(raw).map((k) => {
+      const item = raw[k];
+      return (item && typeof item === 'object') ? Object.assign({ _key: k }, item) : null;
+    }).filter(Boolean);
   }
 
   function setDbBadge(online, text) {
     dbConnected = online;
     const admSt = document.getElementById('adm-db-status');
     if (admSt) {
-      admSt.textContent = text + ' • Ruta: /' + DB_NAMESPACE;
+      admSt.textContent = text + ' • Ruta: /' + DB_NAMESPACE + (currentUid ? (' • UID: ' + currentUid.slice(0, 8) + '...') : '');
     }
   }
 
-  function ensureBootstrapAdmin(list) {
-    const arr = normalizeList(list).filter((u) => u && u.name && (u.passHash || u.isBootstrap));
-    let adm = arr.find((u) => u.name.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
-    if (!adm) {
-      adm = {
-        name: SUPER_ADMIN_EMAIL,
-        alias: safeDisplayAlias(SUPER_ADMIN_EMAIL),
-        salt: BOOTSTRAP_SALT,
-        passHash: BOOTSTRAP_SHA256,
-        fallbackHash: BOOTSTRAP_FALLBACK,
-        role: 'admin',
-        hasGameAccess: true,
-        canCreateSubAdmins: true,
-        mustChangePassword: true,
-        createdAt: Date.now()
-      };
-      arr.unshift(adm);
+  function initExternalFirebase() {
+    fbApp = null;
+    auth = null;
+    database = null;
+    dbConnected = false;
+    if (typeof firebase === 'undefined' || !EXTERNAL_DB_CONFIG.databaseURL || !EXTERNAL_DB_CONFIG.apiKey) {
+      setDbBadge(false, '🟡 Sin conexión con Firebase');
+      return false;
     }
-    return arr;
+    try {
+      fbApp = (firebase.apps && firebase.apps.length)
+        ? firebase.app()
+        : firebase.initializeApp(EXTERNAL_DB_CONFIG);
+      auth = fbApp.auth();
+      database = fbApp.database();
+      database.ref('.info/connected').on('value', (snap) => {
+        const isLive = snap.val() === true;
+        setDbBadge(isLive, isLive ? ('🟢 Conectado a ' + (EXTERNAL_DB_CONFIG.projectId || 'Firebase')) : '🟡 Sin conexión con Firebase');
+      });
+      return true;
+    } catch (e) {
+      setDbBadge(false, 'Error al conectar Firebase (revisa apiKey y databaseURL)');
+      return false;
+    }
+  }
+  initExternalFirebase();
+
+  // Verificar privilegio de administrador únicamente contra /admins/$uid
+  async function checkIsAdminUid(uid) {
+    if (!database || !uid) return false;
+    try {
+      const snap = await database.ref(DB_NAMESPACE + '/admins/' + uid).once('value');
+      return snap.exists() && snap.val() !== false;
+    } catch (e) {
+      return false;
+    }
   }
 
-  function updateLoginModeHint() {
-    const btn = document.getElementById('btn-start-game');
-    if (btn) btn.textContent = 'INGRESAR ▶';
-  }
-
+  // Escritura concurrente segura (.push()) en /securityLogs/$logId
   async function logSecurityEvent(eventType, actor, details) {
     const entry = {
       event: String(eventType),
       actor: safeDisplayAlias(actor || currentUser || 'Sistema'),
+      uid: currentUid || '',
       details: String(details || ''),
       timestamp: Date.now()
     };
     securityLogsDB.unshift(entry);
     if (securityLogsDB.length > 50) securityLogsDB = securityLogsDB.slice(0, 50);
-    try { localStorage.setItem('ubc_seclogs_fallback', JSON.stringify(securityLogsDB)); } catch (e) {}
-    if (database) {
-      database.ref(DB_NAMESPACE + '/securityLogs').set(securityLogsDB).catch(() => {});
+    if (database && auth && auth.currentUser) {
+      database.ref(DB_NAMESPACE + '/securityLogs').push(entry).catch((e) => console.error('Firebase DB error (securityLogs):', e));
     }
   }
 
   async function loadSecurityLogsFromDB() {
+    securityLogsDB = [];
+    if (!database || !isAdminVerified) return securityLogsDB;
     try {
-      securityLogsDB = normalizeList(JSON.parse(localStorage.getItem('ubc_seclogs_fallback') || '[]'));
-    } catch (e) { securityLogsDB = []; }
-    if (!database) return securityLogsDB;
-    await new Promise((resolve) => {
-      let done = false;
-      setTimeout(() => { if (!done) { done = true; resolve(); } }, 1500);
-      database.ref(DB_NAMESPACE + '/securityLogs').once('value').then((snap) => {
-        if (!done) {
-          done = true;
-          const list = normalizeList(snap.val());
-          if (list.length) securityLogsDB = list;
-          resolve();
-        }
-      }).catch(() => { if (!done) { done = true; resolve(); } });
-    });
+      const snap = await database.ref(DB_NAMESPACE + '/securityLogs').limitToLast(50).once('value');
+      const list = normalizeMapToList(snap.val()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      if (list.length) securityLogsDB = list;
+    } catch (e) {}
     return securityLogsDB;
   }
 
-  async function loadUsersFromDB() {
-    return new Promise((resolve) => {
-      let done = false;
-      const finish = (list, online) => {
-        if (done) return;
-        done = true;
-        usersDB = ensureBootstrapAdmin(list);
-        try { localStorage.setItem('ubc_users_sec_fallback', JSON.stringify(usersDB)); } catch (e) {}
-        if (!dbConnected) {
-          setDbBadge(online, online ? '🟢 Firebase Conectado (En Vivo)' : '🟡 Sin conexión externa (Respaldo Local)');
-        }
-        updateLoginModeHint();
-        resolve(usersDB);
-      };
-
-      const readLocal = () => {
-        try {
-          return JSON.parse(localStorage.getItem('ubc_users_sec_fallback') || '[]');
-        } catch (e) { return []; }
-      };
-
-      setTimeout(() => finish(readLocal(), false), 1800);
-
-      if (!database) { finish(readLocal(), false); return; }
-      database.ref(DB_NAMESPACE + '/users').once('value').then((snap) => {
-        const val = snap.val();
-        finish(val || readLocal(), true);
-      }).catch(() => finish(readLocal(), false));
-    });
+  async function syncOwnProfile(user, isAdm) {
+    if (!user) return null;
+    const alias = user.isAnonymous ? 'Invitado' : safeDisplayAlias(user.email || user.displayName || 'Modelo');
+    let existing = null;
+    if (database) {
+      try {
+        const snap = await database.ref(DB_NAMESPACE + '/profiles/' + user.uid).once('value');
+        existing = snap.val();
+      } catch (e) {}
+    }
+    const profile = {
+      uid: user.uid,
+      email: user.email || '',
+      alias: (existing && existing.alias) ? existing.alias : alias,
+      role: isAdm ? 'admin' : ((existing && existing.role === 'subadmin') ? 'subadmin' : (user.isAnonymous ? 'guest' : 'player')),
+      hasGameAccess: (existing && typeof existing.hasGameAccess === 'boolean') ? existing.hasGameAccess : true,
+      createdAt: (existing && existing.createdAt) ? existing.createdAt : Date.now(),
+      lastLoginAt: Date.now()
+    };
+    if (database) {
+      database.ref(DB_NAMESPACE + '/profiles/' + user.uid).set(profile).catch((e) => console.error('Firebase DB error (profiles):', e));
+    }
+    return profile;
   }
 
-  async function saveUsersToDB() {
-    try { localStorage.setItem('ubc_users_sec_fallback', JSON.stringify(usersDB)); } catch (e) {}
-    if (!database) return false;
+  async function loadProfilesForAdmin() {
+    const knownUids = new Set();
+    if (currentUid) knownUids.add(currentUid);
+    sessionKnownUids.forEach((id) => knownUids.add(id));
+    battleHistoryDB.forEach((b) => { if (b && b.uid) knownUids.add(b.uid); });
+    securityLogsDB.forEach((l) => { if (l && l.uid) knownUids.add(l.uid); });
+
+
+    if (!database || !isAdminVerified) return profilesDB;
+
+    // 1. Intentar lectura directa de /profiles (si las reglas permiten lectura admin en el nodo padre)
     try {
-      await database.ref(DB_NAMESPACE + '/users').set(usersDB);
-      return true;
-    } catch (e) { return false; }
+      const snap = await database.ref(DB_NAMESPACE + '/profiles').once('value');
+      const list = normalizeMapToList(snap.val());
+      if (list.length) {
+        profilesDB = list;
+        return profilesDB;
+      }
+    } catch (e) {}
+
+    // 2. Respaldo exacto compatible con regla estricta en /profiles/$uid
+    const fetched = [];
+    for (const uid of knownUids) {
+      try {
+        const s = await database.ref(DB_NAMESPACE + '/profiles/' + uid).once('value');
+        if (s.val()) fetched.push(Object.assign({ uid }, s.val()));
+      } catch (err) {}
+    }
+    profilesDB = fetched;
+    return profilesDB;
   }
 
+  const sessionKnownUids = new Set();
+  function rememberKnownUid(uid) {
+    if (uid) sessionKnownUids.add(uid);
+  }
+
+  // Progreso guardado estrictamente en /progress/$uid (solo escritura por auth.uid == $uid)
   async function saveGameProgressToDB() {
-    if (!currentUser || currentUserRole === 'guest') return;
-    const key = sanitizeKey(currentUser);
+    if (!currentUid) return;
     const payload = {
+      uid: currentUid,
       alias: safeDisplayAlias(currentUser),
       role: currentUserRole,
       level: state.level,
@@ -1021,14 +965,13 @@
       totalScore: state.totalScore,
       updatedAt: Date.now()
     };
-    try { localStorage.setItem('ubc_prog_' + key, JSON.stringify(payload)); } catch (e) {}
-    if (database) {
-      database.ref(DB_NAMESPACE + '/progress/' + key).set(payload).catch(() => {});
+    if (database && auth && auth.currentUser && auth.currentUser.uid === currentUid) {
+      database.ref(DB_NAMESPACE + '/progress/' + currentUid).set(payload).catch((e) => console.error('Firebase DB error (progress):', e));
     }
   }
 
-  async function loadGameProgressFromDB(username) {
-    const key = sanitizeKey(username);
+  async function loadGameProgressFromDB(uid) {
+    if (!uid) return;
     const applyProg = (p) => {
       if (!p) return;
       state.level = Math.max(1, Math.min(STAGES.length, Number(p.level) || 1));
@@ -1039,64 +982,56 @@
       document.querySelectorAll('.couture-opt').forEach((b, i) => b.classList.toggle('active', i === state.outfitIndex));
     };
 
+    if (!database || !auth || !auth.currentUser) return;
     try {
-      const localP = JSON.parse(localStorage.getItem('ubc_prog_' + key) || 'null');
-      if (localP) applyProg(localP);
+      const snap = await database.ref(DB_NAMESPACE + '/progress/' + uid).once('value');
+      if (snap.val()) applyProg(snap.val());
     } catch (e) {}
-
-    if (!database) return;
-    await new Promise((resolve) => {
-      let done = false;
-      setTimeout(() => { if (!done) { done = true; resolve(); } }, 1500);
-      database.ref(DB_NAMESPACE + '/progress/' + key).once('value').then((snap) => {
-        if (!done) {
-          done = true;
-          if (snap.val()) applyProg(snap.val());
-          resolve();
-        }
-      }).catch(() => { if (!done) { done = true; resolve(); } });
-    });
   }
 
+  // Escritura concurrente segura (.push()) en /battles/$battleId cumpliendo .validate
   function recordBattleToDB(record) {
-    const cleanRec = Object.assign({}, record, { user: safeDisplayAlias(record.user) });
+    const cleanRec = {
+      user: safeDisplayAlias(record.user || currentUser || 'Invitado'),
+      uid: currentUid || '',
+      stageName: String(record.stageName || 'Pasarela'),
+      rival: String(record.rival || ''),
+      playerRhythmPct: Number(record.playerRhythmPct || 0),
+      rivalRhythmPct: Number(record.rivalRhythmPct || 0),
+      playerScore: Number(record.playerScore || 0),
+      rivalScore: Number(record.rivalScore || 0),
+      stepsVariety: Number(record.stepsVariety || 0),
+      won: Boolean(record.won),
+      rank: String(record.rank || 'B'),
+      timestamp: Number(record.timestamp || Date.now())
+    };
     battleHistoryDB.unshift(cleanRec);
     if (battleHistoryDB.length > 40) battleHistoryDB = battleHistoryDB.slice(0, 40);
-    try { localStorage.setItem('ubc_battles_fallback', JSON.stringify(battleHistoryDB)); } catch (e) {}
-    if (database) {
-      database.ref(DB_NAMESPACE + '/battles').set(battleHistoryDB).catch(() => {});
+    if (database && auth && auth.currentUser) {
+      database.ref(DB_NAMESPACE + '/battles').push(cleanRec).catch((e) => console.error('Firebase DB error (battles):', e));
     }
   }
 
   async function loadBattleHistoryFromDB() {
-    try {
-      battleHistoryDB = normalizeList(JSON.parse(localStorage.getItem('ubc_battles_fallback') || '[]'));
-    } catch (e) { battleHistoryDB = []; }
+    battleHistoryDB = [];
     if (!database) return battleHistoryDB;
-    await new Promise((resolve) => {
-      let done = false;
-      setTimeout(() => { if (!done) { done = true; resolve(); } }, 1500);
-      database.ref(DB_NAMESPACE + '/battles').once('value').then((snap) => {
-        if (!done) {
-          done = true;
-          const list = normalizeList(snap.val());
-          if (list.length) battleHistoryDB = list;
-          resolve();
-        }
-      }).catch(() => { if (!done) { done = true; resolve(); } });
-    });
+    try {
+      const snap = await database.ref(DB_NAMESPACE + '/battles').limitToLast(40).once('value');
+      const list = normalizeMapToList(snap.val()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      if (list.length) battleHistoryDB = list;
+    } catch (e) {}
     return battleHistoryDB;
   }
 
+  // Solo admins pueden escribir en /settings/music según las reglas
   function saveSharedMusicToDB(rawUrl) {
+    if (!isAdminVerified || !database) return;
     const payload = {
       driveMusicUrl: rawUrl || '',
-      updatedBy: safeDisplayAlias(currentUser || 'Invitado'),
+      updatedBy: safeDisplayAlias(currentUser || 'Admin'),
       updatedAt: Date.now()
     };
-    if (database) {
-      database.ref(DB_NAMESPACE + '/settings/music').set(payload).catch(() => {});
-    }
+    database.ref(DB_NAMESPACE + '/settings/music').set(payload).catch((e) => console.error('Firebase DB error (settings/music):', e));
     logSecurityEvent('MUSIC_UPDATE', currentUser, rawUrl ? 'Pista externa actualizada' : 'Restaurado synth original');
   }
 
@@ -1506,13 +1441,17 @@
 
   function disposeObject3D(obj) {
     if (!obj) return;
+    const cachedTextures = new Set(Object.values(texCache));
     obj.traverse((child) => {
       if (child.geometry) child.geometry.dispose();
       if (child.material) {
         if (Array.isArray(child.material)) {
-          child.material.forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
+          child.material.forEach((m) => {
+            if (m.map && !cachedTextures.has(m.map)) m.map.dispose();
+            m.dispose();
+          });
         } else {
-          if (child.material.map) child.material.map.dispose();
+          if (child.material.map && !cachedTextures.has(child.material.map)) child.material.map.dispose();
           child.material.dispose();
         }
       }
@@ -3434,6 +3373,8 @@
   joyZone.addEventListener('pointercancel', resetJoystick);
 
   window.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toUpperCase() : '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
     const k = e.key.toLowerCase();
     state.keys[k] = true;
     if (state.mode === 'map' && (k === 'e' || k === 'enter') && state.nearbyDoor && state.level >= state.nearbyDoor.levelReq) {
@@ -3463,27 +3404,23 @@
     const btnAdm = document.getElementById('btn-admin-panel');
     const btnOut = document.getElementById('btn-logout');
     const dock = document.getElementById('admin-dock');
-    const isAdminOrMod = (currentUserRole === 'admin' || currentUserRole === 'subadmin');
+    const isAdminOrMod = isAdminVerified || currentUserRole === 'admin' || currentUserRole === 'subadmin';
     if (btnAdm) {
       btnAdm.style.display = 'inline-flex';
       btnAdm.textContent = isAdminOrMod ? '👑 Admin' : '🔑 Admin';
     }
     if (dock) dock.classList.toggle('visible', isAdminOrMod);
-    if (btnOut) btnOut.style.display = currentUser ? 'inline-flex' : 'none';
+    if (btnOut) btnOut.style.display = currentUid ? 'inline-flex' : 'none';
   }
 
   async function openAdminModalTab(tabId) {
-    const isAdminOrMod = (currentUserRole === 'admin' || currentUserRole === 'subadmin');
-    if (!isAdminOrMod) {
-      // Si entró como invitado/jugadora, abrir pantalla de acceso Admin
+    if (!isAdminVerified) {
       document.getElementById('start-modal').classList.remove('hidden');
       return;
     }
-    await loadUsersFromDB();
-    document.getElementById('adm-fb-apikey').value = EXTERNAL_DB_CONFIG.apiKey || '';
-    document.getElementById('adm-fb-projectid').value = EXTERNAL_DB_CONFIG.projectId || '';
-    document.getElementById('adm-fb-dburl').value = EXTERNAL_DB_CONFIG.databaseURL || '';
-    document.getElementById('adm-db-namespace').value = DB_NAMESPACE;
+    await loadBattleHistoryFromDB();
+    await loadSecurityLogsFromDB();
+    await loadProfilesForAdmin();
     renderAdminUsers();
     renderAdminHistory();
     renderAdminSecurityLogs();
@@ -3493,13 +3430,19 @@
     adminModal.classList.remove('hidden');
   }
 
-  async function enterGameSession(user, role) {
-    currentUser = user;
-    currentUserRole = role;
-    if (role !== 'guest') {
-      await loadGameProgressFromDB(user);
+  async function enterGameSession(userObj, profile, isAdm) {
+    currentUid = userObj ? userObj.uid : '';
+    currentUserEmail = (userObj && userObj.email) ? userObj.email : '';
+    currentUser = (profile && profile.alias) ? profile.alias : safeDisplayAlias(currentUserEmail || 'Invitado');
+    isAdminVerified = !!isAdm;
+    currentUserRole = isAdm ? 'admin' : (profile ? profile.role : (userObj && userObj.isAnonymous ? 'guest' : 'player'));
+    rememberKnownUid(currentUid);
+
+    if (currentUid && !userObj.isAnonymous) {
+      await loadGameProgressFromDB(currentUid);
     }
     updateSessionHUD();
+    setDbBadge(dbConnected, dbConnected ? ('🟢 Conectado a ' + (EXTERNAL_DB_CONFIG.projectId || 'Firebase')) : '🟡 Sin conexión con Firebase');
     document.getElementById('start-modal').classList.add('hidden');
     state.mode = 'map';
     buildSantaCruzUrbanMap();
@@ -3508,192 +3451,199 @@
     loadSharedMusicFromDB();
   }
 
+  async function applyPersistenceChoice() {
+    if (!auth || typeof firebase === 'undefined') return;
+    const remember = document.getElementById('chk-remember-session');
+    const mode = (!remember || remember.checked)
+      ? firebase.auth.Auth.Persistence.LOCAL
+      : firebase.auth.Auth.Persistence.SESSION;
+    try { await auth.setPersistence(mode); } catch (e) {}
+  }
+
+  function mapAuthError(err) {
+    const code = (err && err.code) ? err.code : '';
+    if (code === 'auth/invalid-email') return 'Correo electrónico no válido.';
+    if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials') return 'Correo o contraseña incorrectos.';
+    if (code === 'auth/email-already-in-use') return 'Ese correo ya está registrado. Usa INGRESAR.';
+    if (code === 'auth/weak-password') return 'La contraseña debe tener al menos 6 caracteres.';
+    if (code === 'auth/operation-not-allowed') return 'Activa este método en Firebase Console → Authentication.';
+    if (code === 'auth/too-many-requests') return 'Demasiados intentos. Espera un momento antes de reintentar.';
+    return (err && err.message) ? err.message : 'Error de autenticación en Firebase.';
+  }
+
+  async function handleAuthenticatedUser(user, eventTag) {
+    if (!user) return;
+    const isAdm = await checkIsAdminUid(user.uid);
+    const profile = await syncOwnProfile(user, isAdm);
+    if (profile && profile.hasGameAccess === false && !isAdm) {
+      document.getElementById('login-msg').textContent = 'Acceso restringido por administración.';
+      if (auth) await auth.signOut().catch(() => {});
+      return;
+    }
+    await enterGameSession(user, profile, isAdm);
+    if (eventTag) {
+      await logSecurityEvent(eventTag, currentUser, 'Ingreso Firebase Auth (' + currentUserRole + ')');
+    }
+  }
+
   async function performLogin() {
     audio.init();
     const msgEl = document.getElementById('login-msg');
     msgEl.style.color = '#fda4af';
+    const email = (document.getElementById('login-username').value || '').trim();
+    const pass = (document.getElementById('login-password').value || '').trim();
+    if (!email || !email.includes('@')) { msgEl.textContent = 'Ingresa un correo electrónico válido.'; return; }
+    if (pass.length < 6) { msgEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+    if (!auth) { msgEl.textContent = 'Firebase Auth no está inicializado.'; return; }
 
-    if (Date.now() < loginLockUntil) {
-      const secs = Math.ceil((loginLockUntil - Date.now()) / 1000);
-      msgEl.textContent = 'Demasiados intentos fallidos. Espera ' + secs + 's.';
-      return;
-    }
-
-    let u = (document.getElementById('login-username').value || '').trim();
-    const p = (document.getElementById('login-password').value || '').trim();
-    if (!u) { msgEl.textContent = 'Ingresa tu usuario (@nombre) o cuenta Admin.'; return; }
-    if (p.length < 6) { msgEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
-    if (!u.startsWith('@') && !u.includes('@')) u = '@' + u;
-
-    if (!usersDB.length) await loadUsersFromDB();
-
-    let acc = usersDB.find((x) => x && x.name && x.name.toLowerCase() === u.toLowerCase());
-
-    if (acc) {
-      const computedHash = await hashPassword(p, acc.salt || '');
-      const hashMatches = (computedHash === acc.passHash) || (acc.mustChangePassword && acc.fallbackHash && computedHash === acc.fallbackHash);
-      if (!hashMatches) {
-        failedLoginCount++;
-        await logSecurityEvent('LOGIN_FAILED', u, 'Contraseña incorrecta (intento ' + failedLoginCount + ')');
-        if (failedLoginCount >= 5) {
-          loginLockUntil = Date.now() + 30000;
-          failedLoginCount = 0;
-          msgEl.textContent = 'Bloqueo temporal de 30s por seguridad.';
-        } else {
-          msgEl.textContent = 'Credenciales incorrectas. Intenta nuevamente.';
-        }
-        return;
-      }
-      if (!acc.hasGameAccess && acc.role !== 'admin') {
-        msgEl.textContent = 'Acceso restringido por administración.';
-        return;
-      }
-      failedLoginCount = 0;
+    msgEl.style.color = '#facc15';
+    msgEl.textContent = 'Verificando con Firebase Auth...';
+    manualAuthInProgress = true;
+    try {
+      await applyPersistenceChoice();
+      const cred = await auth.signInWithEmailAndPassword(email, pass);
       document.getElementById('login-password').value = '';
       msgEl.textContent = '';
+      await handleAuthenticatedUser(cred.user, 'LOGIN_AUTH_OK');
+    } catch (err) {
+      msgEl.style.color = '#fda4af';
+      msgEl.textContent = mapAuthError(err);
+    } finally {
+      manualAuthInProgress = false;
+    }
+  }
 
-      // Si es el primer arranque del Admin con clave inicial, exigir cambio obligatorio antes de entrar
-      if (acc.mustChangePassword) {
-        pendingForcePassUser = acc;
-        document.getElementById('start-modal').classList.add('hidden');
-        document.getElementById('fp-new-pass').value = '';
-        document.getElementById('fp-confirm-pass').value = '';
-        document.getElementById('fp-msg').textContent = '';
-        document.getElementById('force-pass-modal').classList.remove('hidden');
-        return;
+  async function performRegister() {
+    audio.init();
+    const msgEl = document.getElementById('login-msg');
+    msgEl.style.color = '#fda4af';
+    const email = (document.getElementById('login-username').value || '').trim();
+    const pass = (document.getElementById('login-password').value || '').trim();
+    if (!email || !email.includes('@')) { msgEl.textContent = 'Ingresa tu correo para registrarte.'; return; }
+    if (pass.length < 6) { msgEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+    if (!auth) { msgEl.textContent = 'Firebase Auth no está inicializado.'; return; }
+
+    msgEl.style.color = '#facc15';
+    msgEl.textContent = 'Creando cuenta en Firebase Auth...';
+    manualAuthInProgress = true;
+    try {
+      await applyPersistenceChoice();
+      const cred = await auth.createUserWithEmailAndPassword(email, pass);
+      document.getElementById('login-password').value = '';
+      msgEl.textContent = '';
+      await handleAuthenticatedUser(cred.user, 'USER_AUTH_REGISTER');
+    } catch (err) {
+      msgEl.style.color = '#fda4af';
+      msgEl.textContent = mapAuthError(err);
+    } finally {
+      manualAuthInProgress = false;
+    }
+  }
+
+  async function performGuestLogin() {
+    audio.init();
+    const msgEl = document.getElementById('login-msg');
+    manualAuthInProgress = true;
+    try {
+      if (auth) {
+        try {
+          await applyPersistenceChoice();
+          const cred = await auth.signInAnonymously();
+          msgEl.textContent = '';
+          await handleAuthenticatedUser(cred.user, 'GUEST_ANON_LOGIN');
+          return;
+        } catch (err) {
+          // Si Anonymous Auth no está activado aún en Firebase Console, permite jugar en modo local
+          if (msgEl) msgEl.textContent = '';
+        }
       }
-
-      acc.lastLoginAt = Date.now();
-      await saveUsersToDB();
-      await logSecurityEvent('LOGIN_OK', acc.name, 'Ingreso verificado (' + acc.role + ')');
-    } else {
-      const salt = generateSalt();
-      const passHash = await hashPassword(p, salt);
-      acc = {
-        name: u,
-        alias: safeDisplayAlias(u),
-        salt,
-        passHash,
-        role: 'player',
-        hasGameAccess: true,
-        canCreateSubAdmins: false,
-        mustChangePassword: false,
-        createdAt: Date.now(),
-        lastLoginAt: Date.now()
-      };
-      usersDB.push(acc);
-      await saveUsersToDB();
-      await logSecurityEvent('USER_REGISTER', acc.name, 'Cuenta creada con hash SHA-256');
+      await enterGameSession({ uid: '', isAnonymous: true }, { alias: 'Invitado', role: 'guest' }, false);
+    } finally {
+      manualAuthInProgress = false;
     }
-
-    const remember = document.getElementById('chk-remember-session');
-    if (!remember || remember.checked) {
-      try { localStorage.setItem('ubc_saved_session', JSON.stringify({ name: acc.name })); } catch (e) {}
-    }
-    msgEl.textContent = '';
-    document.getElementById('login-password').value = '';
-    await enterGameSession(acc.name, acc.role);
   }
 
   document.getElementById('btn-start-game').addEventListener('click', performLogin);
+  document.getElementById('btn-register-user').addEventListener('click', performRegister);
+  document.getElementById('btn-guest-login').addEventListener('click', performGuestLogin);
   document.getElementById('login-password').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') performLogin();
   });
-
-  async function saveForcedAdminPassword() {
-    if (!pendingForcePassUser) return;
-    const fpMsg = document.getElementById('fp-msg');
-    const np = (document.getElementById('fp-new-pass').value || '').trim();
-    const cp = (document.getElementById('fp-confirm-pass').value || '').trim();
-
-    if (np.length < 8) {
-      fpMsg.textContent = 'La nueva contraseña debe tener al menos 8 caracteres.';
+  document.getElementById('btn-forgot-pass').addEventListener('click', async () => {
+    const msgEl = document.getElementById('login-msg');
+    const email = (document.getElementById('login-username').value || '').trim();
+    if (!email || !email.includes('@')) {
+      msgEl.style.color = '#fda4af';
+      msgEl.textContent = 'Escribe tu correo arriba para enviarte el enlace de restablecimiento.';
       return;
     }
-    if (np !== cp) {
-      fpMsg.textContent = 'Las contraseñas no coinciden.';
-      return;
+    if (!auth) return;
+    try {
+      await auth.sendPasswordResetEmail(email);
+      msgEl.style.color = '#34d399';
+      msgEl.textContent = 'Enlace oficial de restablecimiento enviado a ' + safeDisplayAlias(email);
+    } catch (err) {
+      msgEl.style.color = '#fda4af';
+      msgEl.textContent = mapAuthError(err);
     }
-    // Verificar que no reutilice la clave inicial
-    const checkBoot = await hashPassword(np, BOOTSTRAP_SALT);
-    if (checkBoot === BOOTSTRAP_SHA256 || checkBoot === BOOTSTRAP_FALLBACK) {
-      fpMsg.textContent = 'Debes elegir una contraseña diferente a la inicial.';
-      return;
-    }
-
-    const newSalt = generateSalt();
-    pendingForcePassUser.salt = newSalt;
-    pendingForcePassUser.passHash = await hashPassword(np, newSalt);
-    delete pendingForcePassUser.fallbackHash;
-    pendingForcePassUser.mustChangePassword = false;
-    pendingForcePassUser.lastLoginAt = Date.now();
-
-    await saveUsersToDB();
-    await logSecurityEvent('ADMIN_PASS_ROTATED', pendingForcePassUser.name, 'Clave inicial revocada y reemplazada con SHA-256');
-
-    const remember = document.getElementById('chk-remember-session');
-    if (!remember || remember.checked) {
-      try { localStorage.setItem('ubc_saved_session', JSON.stringify({ name: pendingForcePassUser.name })); } catch (e) {}
-    }
-
-    const acc = pendingForcePassUser;
-    pendingForcePassUser = null;
-    document.getElementById('fp-new-pass').value = '';
-    document.getElementById('fp-confirm-pass').value = '';
-    document.getElementById('force-pass-modal').classList.add('hidden');
-    await enterGameSession(acc.name, acc.role);
-  }
-
-  document.getElementById('btn-save-force-pass').addEventListener('click', saveForcedAdminPassword);
-  document.getElementById('fp-confirm-pass').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') saveForcedAdminPassword();
   });
 
-  document.getElementById('btn-guest-login').addEventListener('click', () => {
-    audio.init();
-    enterGameSession('Invitado', 'guest');
-  });
-
-  document.getElementById('btn-logout').addEventListener('click', () => {
+  document.getElementById('btn-logout').addEventListener('click', async () => {
     audio.stopBeat();
-    try { localStorage.removeItem('ubc_saved_session'); } catch (e) {}
-    logSecurityEvent('LOGOUT', currentUser, 'Sesión cerrada');
+    await logSecurityEvent('LOGOUT', currentUser, 'Sesión cerrada');
+    if (auth) {
+      try { await auth.signOut(); } catch (e) {}
+    }
+    currentUid = '';
     currentUser = '';
+    currentUserEmail = '';
     currentUserRole = 'guest';
+    isAdminVerified = false;
+    state.level = 1;
+    state.outfitIndex = 0;
+    state.cleared = [false, false, false, false, false];
+    state.bestRanks = ['', '', '', '', ''];
+    state.totalScore = 0;
+    state.playerPos = { x: 0, z: 10 };
+    state.playerYaw = Math.PI;
+    document.querySelectorAll('.couture-opt').forEach((b, i) => b.classList.toggle('active', i === 0));
     state.mode = 'title';
     document.getElementById('battle-ui').classList.remove('active');
     document.getElementById('btn-exit-battle').style.display = 'none';
     document.getElementById('radar-box').style.display = 'block';
+    updateGlobalHUD();
     updateSessionHUD();
     updateMapHUDVisibility();
-    updateLoginModeHint();
     document.getElementById('start-modal').classList.remove('hidden');
   });
 
-  // PANEL DE ADMINISTRACIÓN (XSS-SAFE DOM + SHA-256 + AUDITORÍA)
+  // PANEL DE ADMINISTRACIÓN CONECTADO A PERFILES REALES (/profiles/$uid)
   const adminModal = document.getElementById('admin-modal');
   function renderAdminUsers() {
     const listEl = document.getElementById('adm-users-list');
     if (!listEl) return;
     listEl.innerHTML = '';
-    const me = usersDB.find((u) => u.name.toLowerCase() === currentUser.toLowerCase());
-    const canSub = currentUserRole === 'admin' || (me && me.canCreateSubAdmins);
-    const optSub = document.getElementById('adm-opt-subadmin');
-    if (optSub) { optSub.hidden = !canSub; optSub.disabled = !canSub; }
 
-    const weight = { admin: 1, subadmin: 2, player: 3 };
-    const sorted = [...usersDB].sort((a, b) => (weight[a.role] || 9) - (weight[b.role] || 9));
+    if (!profilesDB.length) {
+      const empty = document.createElement('div');
+      empty.className = 'admin-card';
+      empty.style.cssText = 'font-size:11px; color:var(--muted);';
+      empty.textContent = 'Aún no hay perfiles cargados en /profiles.';
+      listEl.appendChild(empty);
+      return;
+    }
+
+    const weight = { admin: 1, subadmin: 2, player: 3, guest: 4 };
+    const sorted = [...profilesDB].sort((a, b) => (weight[a.role] || 9) - (weight[b.role] || 9));
     sorted.forEach((u) => {
-      if (u.role === 'admin' && currentUserRole !== 'admin') return;
       const card = document.createElement('div');
-      card.className = 'admin-card' + (u.hasGameAccess ? '' : ' banned');
-      const roleTxt = u.role === 'admin' ? '👑 Admin' : (u.role === 'subadmin' ? '🎧 Mod' : '💃 Jugadora');
-      const canEdit = currentUserRole === 'admin' || (currentUserRole === 'subadmin' && u.role === 'player');
+      card.className = 'admin-card' + (u.hasGameAccess === false ? ' banned' : '');
+      const roleTxt = u.role === 'admin' ? '👑 Admin' : (u.role === 'subadmin' ? '🎧 Mod' : (u.role === 'guest' ? '⚡ Invitado' : '💃 Jugadora'));
 
       const top = document.createElement('div');
       top.className = 'admin-card-top';
       const nameSpan = document.createElement('span');
-      nameSpan.textContent = safeDisplayAlias(u.name);
+      nameSpan.textContent = safeDisplayAlias(u.alias || u.email || u.uid);
       const roleSpan = document.createElement('span');
       roleSpan.style.cssText = 'color:var(--gold); font-size:10px;';
       roleSpan.textContent = roleTxt;
@@ -3704,50 +3654,35 @@
       const act = document.createElement('div');
       act.className = 'admin-card-actions';
 
-      const passInp = document.createElement('input');
-      passInp.type = 'password';
-      passInp.className = 'mini-input';
-      passInp.value = '';
-      passInp.placeholder = 'Nueva clave (mín. 6)';
-      passInp.disabled = !canEdit;
-      passInp.addEventListener('change', async () => {
-        const np = passInp.value.trim();
-        if (np.length < 6) {
-          document.getElementById('adm-users-msg').textContent = 'La nueva clave debe tener al menos 6 caracteres.';
-          return;
-        }
-        u.salt = generateSalt();
-        u.passHash = await hashPassword(np, u.salt);
-        passInp.value = '';
-        await saveUsersToDB();
-        await logSecurityEvent('PASS_RESET', currentUser, 'Clave actualizada (SHA-256) para ' + safeDisplayAlias(u.name));
-        document.getElementById('adm-users-msg').textContent = 'Clave actualizada con SHA-256 para ' + safeDisplayAlias(u.name);
-      });
-      act.appendChild(passInp);
+      if (u.email && auth) {
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'mini-btn warn';
+        resetBtn.textContent = '📧 Restablecer clave';
+        resetBtn.addEventListener('click', async () => {
+          try {
+            await auth.sendPasswordResetEmail(u.email);
+            await logSecurityEvent('PASS_RESET_EMAIL', currentUser, 'Envió correo oficial de restablecimiento a ' + safeDisplayAlias(u.email));
+            document.getElementById('adm-users-msg').textContent = 'Correo oficial de restablecimiento enviado a ' + safeDisplayAlias(u.email);
+          } catch (err) {
+            document.getElementById('adm-users-msg').textContent = mapAuthError(err);
+          }
+        });
+        act.appendChild(resetBtn);
+      }
 
-      if (currentUserRole === 'admin' && u.role !== 'admin') {
+      if (isAdminVerified && u.uid && u.role !== 'admin') {
         const banBtn = document.createElement('button');
-        banBtn.className = 'mini-btn ' + (u.hasGameAccess ? '' : 'danger');
-        banBtn.textContent = u.hasGameAccess ? 'Acceso: 🔓' : 'Acceso: 🔒';
+        banBtn.className = 'mini-btn ' + (u.hasGameAccess === false ? 'danger' : '');
+        banBtn.textContent = u.hasGameAccess === false ? 'Acceso: 🔒' : 'Acceso: 🔓';
         banBtn.addEventListener('click', async () => {
-          u.hasGameAccess = !u.hasGameAccess;
-          await saveUsersToDB();
-          await logSecurityEvent('ACCESS_TOGGLE', currentUser, safeDisplayAlias(u.name) + ' -> ' + (u.hasGameAccess ? 'habilitado' : 'restringido'));
+          u.hasGameAccess = (u.hasGameAccess === false);
+          if (database) {
+            await database.ref(DB_NAMESPACE + '/profiles/' + u.uid + '/hasGameAccess').set(u.hasGameAccess).catch(() => {});
+          }
+          await logSecurityEvent('ACCESS_TOGGLE', currentUser, safeDisplayAlias(u.alias || u.email) + ' -> ' + (u.hasGameAccess ? 'habilitado' : 'restringido'));
           renderAdminUsers();
         });
         act.appendChild(banBtn);
-      }
-      if (currentUserRole === 'admin' && u.role === 'subadmin') {
-        const subBtn = document.createElement('button');
-        subBtn.className = 'mini-btn warn';
-        subBtn.textContent = u.canCreateSubAdmins ? 'Crear Mods: SÍ' : 'Crear Mods: NO';
-        subBtn.addEventListener('click', async () => {
-          u.canCreateSubAdmins = !u.canCreateSubAdmins;
-          await saveUsersToDB();
-          await logSecurityEvent('PERM_UPDATE', currentUser, 'Permiso Mods actualizado para ' + safeDisplayAlias(u.name));
-          renderAdminUsers();
-        });
-        act.appendChild(subBtn);
       }
 
       card.appendChild(act);
@@ -3773,7 +3708,6 @@
       return;
     }
 
-    // Construir Top 10 Global por mejor ritmo promedio y puntaje total (XSS-safe)
     if (top10El) {
       const byPlayer = new Map();
       battleHistoryDB.forEach((h) => {
@@ -3843,7 +3777,7 @@
     const sumEl = document.getElementById('adm-sec-summary');
     if (!listEl) return;
     listEl.innerHTML = '';
-    sumEl.textContent = 'Auditoría de seguridad (SHA-256 activo): ' + securityLogsDB.length + ' eventos verificados.';
+    sumEl.textContent = 'Auditoría en /securityLogs (Firebase Auth UID): ' + securityLogsDB.length + ' eventos.';
     if (!securityLogsDB.length) {
       const empty = document.createElement('div');
       empty.className = 'admin-card';
@@ -3892,69 +3826,69 @@
     });
   });
 
+  // Crear cuenta desde Admin usando instancia secundaria temporal de Firebase (no cierra la sesión Admin)
   document.getElementById('btn-adm-create-user').addEventListener('click', async () => {
-    let name = (document.getElementById('adm-new-user').value || '').trim();
+    const email = (document.getElementById('adm-new-user').value || '').trim();
     const pass = (document.getElementById('adm-new-pass').value || '').trim();
     const role = document.getElementById('adm-new-role').value;
     const msg = document.getElementById('adm-users-msg');
-    if (!name || pass.length < 6) { msg.textContent = 'Ingresa usuario y una contraseña de al menos 6 caracteres.'; return; }
-    if (!name.startsWith('@') && !name.includes('@')) name = '@' + name;
-    if (usersDB.find((u) => u.name.toLowerCase() === name.toLowerCase())) {
-      msg.textContent = 'Ese usuario ya existe en la base de datos.'; return;
+    if (!email || !email.includes('@') || pass.length < 6) {
+      msg.textContent = 'Ingresa un correo válido y contraseña de al menos 6 caracteres.';
+      return;
     }
-    const salt = generateSalt();
-    const passHash = await hashPassword(pass, salt);
-    usersDB.push({
-      name, alias: safeDisplayAlias(name), salt, passHash, role,
-      hasGameAccess: true, canCreateSubAdmins: false,
-      createdAt: Date.now()
-    });
-    await saveUsersToDB();
-    await logSecurityEvent('USER_CREATED', currentUser, 'Creó cuenta ' + safeDisplayAlias(name) + ' (' + role + ')');
-    document.getElementById('adm-new-user').value = '';
-    document.getElementById('adm-new-pass').value = '';
-    msg.textContent = 'Cuenta ' + safeDisplayAlias(name) + ' guardada con SHA-256 en Firebase DB.';
-    renderAdminUsers();
+    if (typeof firebase === 'undefined' || !database || !isAdminVerified) {
+      msg.textContent = 'Requiere sesión Admin verificada en Firebase.';
+      return;
+    }
+
+    msg.textContent = 'Creando cuenta en Firebase Auth (instancia secundaria)...';
+    const secName = 'ubc_sec_create_' + Date.now();
+    let secApp = null;
+    try {
+      secApp = firebase.initializeApp(EXTERNAL_DB_CONFIG, secName);
+      const cred = await secApp.auth().createUserWithEmailAndPassword(email, pass);
+      const newUid = cred.user.uid;
+      await secApp.auth().signOut();
+      const newProfile = {
+        uid: newUid,
+        email,
+        alias: safeDisplayAlias(email),
+        role: role === 'subadmin' ? 'subadmin' : 'player',
+        hasGameAccess: true,
+        createdAt: Date.now(),
+        lastLoginAt: 0
+      };
+      await database.ref(DB_NAMESPACE + '/profiles/' + newUid).set(newProfile);
+      rememberKnownUid(newUid);
+      await logSecurityEvent('USER_CREATED_AUTH', currentUser, 'Creó cuenta ' + safeDisplayAlias(email) + ' (' + newProfile.role + ')');
+      document.getElementById('adm-new-user').value = '';
+      document.getElementById('adm-new-pass').value = '';
+      msg.textContent = 'Cuenta ' + safeDisplayAlias(email) + ' creada en Firebase Auth sin cerrar tu sesión.';
+      await loadProfilesForAdmin();
+      renderAdminUsers();
+    } catch (err) {
+      msg.textContent = mapAuthError(err);
+    } finally {
+      if (secApp) {
+        try { await secApp.delete(); } catch (e) {}
+      }
+    }
   });
 
-  document.getElementById('btn-adm-save-ns').addEventListener('click', async () => {
-    const apiKey = (document.getElementById('adm-fb-apikey').value || '').trim();
-    const projectId = (document.getElementById('adm-fb-projectid').value || '').trim();
-    const databaseURL = (document.getElementById('adm-fb-dburl').value || '').trim();
-    const ns = (document.getElementById('adm-db-namespace').value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
-    if (ns) {
-      DB_NAMESPACE = ns;
-      try { localStorage.setItem('ubc_db_namespace', DB_NAMESPACE); } catch (e) {}
-    }
-    if (apiKey && databaseURL) {
-      EXTERNAL_DB_CONFIG.apiKey = apiKey;
-      EXTERNAL_DB_CONFIG.projectId = projectId;
-      EXTERNAL_DB_CONFIG.authDomain = projectId ? (projectId + '.firebaseapp.com') : '';
-      EXTERNAL_DB_CONFIG.databaseURL = databaseURL;
-      try { localStorage.setItem('ubc_custom_fb_config', JSON.stringify(EXTERNAL_DB_CONFIG)); } catch (e) {}
-      initExternalFirebase();
-    }
-    await saveUsersToDB();
+  document.getElementById('btn-adm-sync-now').addEventListener('click', async () => {
     await saveGameProgressToDB();
-    await logSecurityEvent('DB_CONFIG', currentUser, 'Proyecto DB actualizado: ' + (projectId || 'local') + ' /' + DB_NAMESPACE);
-    await loadUsersFromDB();
+    await loadBattleHistoryFromDB();
+    await loadSecurityLogsFromDB();
+    await loadProfilesForAdmin();
     renderAdminUsers();
     renderAdminHistory();
     renderAdminSecurityLogs();
   });
 
-  document.getElementById('btn-adm-sync-now').addEventListener('click', async () => {
-    await loadUsersFromDB();
-    await saveGameProgressToDB();
-    await renderAdminHistory();
-    await renderAdminSecurityLogs();
-    renderAdminUsers();
-  });
-
   document.getElementById('btn-adm-export-json').addEventListener('click', () => {
-    // Exportar respaldo limpio sin exponer hashes ni salts
-    const safeUsers = usersDB.map((u) => ({
-      alias: u.alias || safeDisplayAlias(u.name),
+    const safeProfiles = profilesDB.map((u) => ({
+      uid: u.uid,
+      alias: u.alias || safeDisplayAlias(u.email),
       role: u.role,
       hasGameAccess: u.hasGameAccess,
       createdAt: u.createdAt,
@@ -3963,7 +3897,7 @@
     const dump = {
       namespace: DB_NAMESPACE,
       exportedAt: new Date().toISOString(),
-      users: safeUsers,
+      profiles: safeProfiles,
       battles: battleHistoryDB,
       securityLogs: securityLogsDB
     };
@@ -4006,19 +3940,6 @@
     if (musicHudBtn) musicHudBtn.classList.toggle('active', !!isExternal);
   }
 
-  // Cargar pista guardada en localStorage si existe
-  try {
-    const savedDriveUrl = localStorage.getItem('ubc_drive_music_url');
-    if (savedDriveUrl) {
-      driveUrlInput.value = savedDriveUrl;
-      const parsed = parseDriveAudioUrl(savedDriveUrl);
-      if (parsed) {
-        audio.setCustomTrack(parsed.primary, parsed.label, parsed.fallback);
-        updateMusicStatusUI('Pista lista (' + parsed.label + '). Sonará al iniciar cada turno.', true);
-      }
-    }
-  } catch (e) {}
-
   musicHudBtn.addEventListener('click', () => {
     audio.init();
     musicModal.classList.remove('hidden');
@@ -4034,7 +3955,6 @@
       return;
     }
     audio.setCustomTrack(parsed.primary, parsed.label, parsed.fallback);
-    try { localStorage.setItem('ubc_drive_music_url', raw); } catch (e) {}
     saveSharedMusicToDB(raw);
     updateMusicStatusUI('Pista guardada (' + parsed.label + '). Sonará automáticamente al iniciar cada turno.', true);
   });
@@ -4057,7 +3977,6 @@
   document.getElementById('btn-clear-track').addEventListener('click', () => {
     audio.setCustomTrack('', '', '');
     driveUrlInput.value = '';
-    try { localStorage.removeItem('ubc_drive_music_url'); } catch (e) {}
     saveSharedMusicToDB('');
     updateMusicStatusUI('Estado: Usando ritmos bolivianos originales (sin pista externa).', false);
   });
@@ -4341,21 +4260,19 @@
   }
 
   window.addEventListener('resize', resizeCanvases);
-  window.addEventListener('load', async () => {
+  window.addEventListener('load', () => {
     buildSantaCruzUrbanMap();
     updateGlobalHUD();
     updateMapHUDVisibility();
     resizeCanvases();
     requestAnimationFrame(animate);
-    await loadUsersFromDB();
-    // Pre-rellenar último usuario recordado para ingreso rápido
-    try {
-      const saved = JSON.parse(localStorage.getItem('ubc_saved_session') || 'null');
-      if (saved && saved.name) {
-        const inp = document.getElementById('login-username');
-        if (inp) inp.value = saved.name;
-      }
-    } catch (e) {}
+    if (auth) {
+      auth.onAuthStateChanged(async (user) => {
+        if (user && state.mode === 'title' && !manualAuthInProgress) {
+          await handleAuthenticatedUser(user, null);
+        }
+      });
+    }
   });
 })();
 </script>
