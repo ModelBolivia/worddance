@@ -1,0 +1,4363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Urban Beat Camba 3D — Edición Santa Cruz Camba &amp; Alta Moda Bolivia</title>
+<meta name="description" content="Batallas de baile y pasarela 3D de alta costura en Santa Cruz de la Sierra, Bolivia, con 5 escenarios icónicos, 12 pasos coreográficos, Tap Tempo y ranking global." />
+<meta property="og:title" content="Urban Beat Camba 3D" />
+<meta property="og:description" content="Batallas de baile y pasarela 3D de alta costura en Santa Cruz de la Sierra, Bolivia, con 5 escenarios icónicos, 12 pasos coreográficos, Tap Tempo y ranking global." />
+<meta property="og:type" content="website" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<style>
+  :root {
+    --bg: #0b0d16;
+    --panel: rgba(12, 16, 28, 0.92);
+    --panel-border: rgba(250, 204, 21, 0.42);
+    --emerald: #10b981;
+    --emerald-bright: #34d399;
+    --tajibo: #f43f5e;
+    --gold: #facc15;
+    --cream: #fef3c7;
+    --orchid: #c084fc;
+    --text: #f8fafc;
+    --muted: #cbd5e1;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; user-select: none; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg); color: var(--text);
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    touch-action: none;
+  }
+  #game-wrap { position: relative; width: 100%; height: 100%; overflow: hidden; }
+  #webgl-container { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #webgl-container canvas { display: block; width: 100%; height: 100%; }
+
+  /* TOP HUD */
+  #top-hud {
+    position: absolute; top: 10px; left: 10px; right: 10px; z-index: 20;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;
+    pointer-events: none;
+  }
+  .hud-card {
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 14px; padding: 8px 12px; pointer-events: auto;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.48);
+  }
+  .player-badge { display: flex; align-items: center; gap: 10px; }
+  .lvl-pill {
+    width: 38px; height: 38px; border-radius: 11px;
+    background: linear-gradient(135deg, var(--emerald-bright), var(--gold));
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 14px; line-height: 1; color: #05120c;
+    flex-shrink: 0;
+  }
+  .lvl-pill span { font-size: 8px; letter-spacing: 0.6px; font-weight: 800; }
+  .player-meta { display: flex; flex-direction: column; gap: 3px; min-width: 122px; }
+  .player-name { font-size: 11px; font-weight: 900; letter-spacing: 0.5px; color: var(--cream); }
+  .xp-bar-bg { width: 100%; height: 6px; background: rgba(255,255,255,0.12); border-radius: 99px; overflow: hidden; }
+  .xp-bar-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--emerald-bright), var(--gold)); transition: width 0.35s ease; }
+  .player-sub { font-size: 10px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
+
+  .top-right-group { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: auto; }
+  .icon-row { display: flex; gap: 5px; flex-wrap: nowrap; justify-content: flex-end; }
+  .hud-btn {
+    background: var(--panel); border: 1px solid var(--panel-border); color: #fff;
+    border-radius: 10px; padding: 6px 8px; font-size: 10.5px; font-weight: 800;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 3px; white-space: nowrap;
+    transition: transform 0.12s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .hud-btn:active { transform: scale(0.95); }
+  .hud-btn.active { border-color: var(--emerald-bright); background: rgba(16, 185, 129, 0.28); }
+
+  /* MINI RADAR (MAP MODE) */
+  #radar-box {
+    width: 114px; height: 114px; border-radius: 16px;
+    background: rgba(10, 15, 24, 0.94); border: 1.5px solid rgba(52, 211, 153, 0.55);
+    padding: 4px; position: relative; overflow: hidden;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.55);
+  }
+  #radar-canvas { width: 100%; height: 100%; display: block; border-radius: 12px; }
+  .radar-label {
+    position: absolute; bottom: 4px; left: 0; right: 0; text-align: center;
+    font-size: 8px; font-weight: 900; letter-spacing: 0.7px; color: var(--gold);
+    text-shadow: 0 1px 3px #000; pointer-events: none;
+  }
+
+  /* OBJECTIVE BANNER (MAP MODE) */
+  #mission-banner {
+    position: absolute; top: 68px; left: 10px; z-index: 19;
+    max-width: 245px; background: var(--panel); border-left: 3px solid var(--emerald-bright);
+    border-radius: 10px; padding: 7px 10px; font-size: 11px; line-height: 1.35;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.45); pointer-events: none;
+  }
+  #mission-banner strong { color: var(--gold); display: block; font-size: 10px; letter-spacing: 0.7px; text-transform: uppercase; margin-bottom: 2px; }
+  #mission-text { color: #f1f5f9; font-weight: 600; }
+
+  /* DOOR INTERACT PROMPT */
+  #door-prompt {
+    position: absolute; bottom: 168px; left: 50%; transform: translateX(-50%);
+    z-index: 25; display: none; flex-direction: column; align-items: center; gap: 6px;
+    background: rgba(12, 16, 28, 0.96); border: 2px solid var(--gold);
+    border-radius: 16px; padding: 12px 18px; text-align: center; min-width: 255px;
+    box-shadow: 0 0 28px rgba(250, 204, 21, 0.35);
+  }
+  #door-prompt.visible { display: flex; }
+  #door-prompt-title { font-size: 13px; font-weight: 900; color: var(--gold); letter-spacing: 0.4px; }
+  #door-prompt-sub { font-size: 11px; color: var(--muted); }
+  #btn-enter-door {
+    margin-top: 4px; width: 100%; padding: 10px 16px; border: none; border-radius: 11px;
+    background: linear-gradient(90deg, var(--emerald-bright), var(--gold));
+    color: #05120c; font-weight: 900; font-size: 13px; letter-spacing: 0.5px; cursor: pointer;
+  }
+  #btn-enter-door:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+
+  /* MAP BOTTOM CONTROLS (JOYSTICK + QUICK GUIDE) */
+  #map-controls {
+    position: absolute; bottom: 16px; left: 16px; right: 16px; z-index: 22;
+    display: flex; justify-content: space-between; align-items: flex-end; pointer-events: none;
+  }
+  #joystick-zone {
+    width: 124px; height: 124px; border-radius: 50%;
+    background: rgba(12, 18, 30, 0.76); border: 2px solid rgba(52, 211, 153, 0.55);
+    position: relative; pointer-events: auto; touch-action: none;
+  }
+  #joystick-knob {
+    width: 50px; height: 50px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--emerald-bright), var(--gold));
+    position: absolute; left: 37px; top: 37px;
+    box-shadow: 0 0 14px rgba(52, 211, 153, 0.65);
+    pointer-events: none;
+  }
+  .map-right-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto; }
+  .circuit-dots {
+    display: flex; gap: 5px; background: var(--panel); padding: 6px 9px;
+    border-radius: 99px; border: 1px solid var(--panel-border);
+  }
+  .c-dot {
+    width: 24px; height: 24px; border-radius: 50%; font-size: 10px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.08); color: var(--muted); border: 1px solid rgba(255,255,255,0.14);
+    cursor: pointer;
+  }
+  .c-dot.current { background: var(--gold); color: #05120c; border-color: #fff; }
+  .c-dot.cleared { background: var(--emerald-bright); color: #05120c; border-color: var(--emerald-bright); }
+  .c-dot.locked { opacity: 0.42; }
+
+  #btn-autowalk {
+    padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--gold);
+    background: rgba(250, 204, 21, 0.18); color: var(--gold);
+    font-weight: 800; font-size: 12px; cursor: pointer;
+  }
+  #btn-autowalk.active { background: var(--gold); color: #05120c; }
+
+  /* BATTLE UI OVERLAY (PASARELA POR TURNOS + CONSOLA MODEL BOLIVIA 2026) */
+  #battle-ui {
+    position: absolute; inset: 0; z-index: 30; display: none;
+    flex-direction: column; justify-content: space-between; pointer-events: none;
+    padding: 8px 10px 10px;
+  }
+  #battle-ui.active { display: flex; }
+
+  #battle-top {
+    display: flex; flex-direction: column; gap: 6px; margin-top: 56px;
+    max-width: 540px; width: 100%; align-self: center;
+  }
+  .turn-banner {
+    align-self: center; padding: 4px 14px; border-radius: 99px;
+    font-size: 11px; font-weight: 900; letter-spacing: 0.7px; text-transform: uppercase;
+    background: rgba(16, 185, 129, 0.24); border: 1.5px solid var(--emerald-bright);
+    color: var(--cream); box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+  }
+  .turn-banner.rival-turn {
+    background: rgba(244, 63, 94, 0.26); border-color: var(--tajibo); color: #ffe4e6;
+  }
+  .turn-banner.swap-turn {
+    background: rgba(250, 204, 21, 0.28); border-color: var(--gold); color: var(--gold);
+  }
+
+  .vs-header {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    background: var(--panel); border: 1px solid var(--panel-border);
+    border-radius: 14px; padding: 7px 12px;
+  }
+  .fighter-tag { display: flex; flex-direction: column; flex: 1; }
+  .fighter-tag.right { text-align: right; }
+  .fighter-role { font-size: 9px; font-weight: 800; letter-spacing: 0.6px; color: var(--emerald-bright); }
+  .fighter-tag.right .fighter-role { color: var(--tajibo); }
+  .fighter-name { font-size: 12px; font-weight: 900; color: #fff; }
+  .fighter-tag.spotlight .fighter-name { color: var(--gold); }
+  .battle-timer-box {
+    text-align: center; background: rgba(255,255,255,0.06);
+    padding: 4px 12px; border-radius: 10px; border: 1px solid rgba(250,204,21,0.35);
+    min-width: 78px;
+  }
+  #battle-timer { font-size: 18px; font-weight: 900; color: var(--gold); line-height: 1.1; }
+  #battle-stage-name { font-size: 8.5px; color: var(--cream); font-weight: 800; text-transform: uppercase; }
+
+  .jury-console {
+    background: var(--panel); border: 1px solid rgba(250, 204, 21, 0.32);
+    border-radius: 12px; padding: 6px 10px;
+  }
+  .jury-row {
+    display: flex; justify-content: space-between; align-items: center; gap: 6px;
+    font-size: 10px; font-weight: 800; margin-bottom: 5px;
+  }
+  .jury-col { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .jury-col.right { justify-content: flex-end; }
+  .jury-pill {
+    padding: 2px 7px; border-radius: 7px; font-size: 10px; font-weight: 900;
+    background: rgba(255,255,255,0.07);
+  }
+  .jury-pill.player { color: var(--emerald-bright); border: 1px solid rgba(52, 211, 153, 0.35); }
+  .jury-pill.rival { color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.38); }
+  .jury-bars {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+  .j-bar-track {
+    height: 7px; border-radius: 99px; background: rgba(255,255,255,0.10); overflow: hidden;
+  }
+  .j-bar-fill-p {
+    height: 100%; width: 0%; background: linear-gradient(90deg, var(--emerald-bright), var(--gold));
+    transition: width 0.18s ease;
+  }
+  .j-bar-fill-r {
+    height: 100%; width: 0%; background: linear-gradient(90deg, #fb7185, #f43f5e);
+    transition: width 0.18s ease; margin-left: auto;
+  }
+
+  /* JUDGMENT FLOATING TEXT */
+  #judge-pop {
+    position: absolute; top: 41%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 24px; font-weight: 900; letter-spacing: 0.8px; text-align: center;
+    text-shadow: 0 3px 14px rgba(0,0,0,0.92); pointer-events: none;
+    opacity: 0; transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  #judge-pop.show { opacity: 1; transform: translate(-50%, -62%) scale(1.06); }
+
+  /* RIVAL SOLO WATCH BAR (TURNO 1) */
+  #rival-watch-bar {
+    max-width: 460px; width: 100%; align-self: center;
+    background: var(--panel); border: 1.5px solid rgba(244, 63, 94, 0.55);
+    border-radius: 16px; padding: 12px 14px; pointer-events: auto;
+    display: none; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+    box-shadow: 0 8px 26px rgba(0,0,0,0.58);
+  }
+  #rival-watch-bar.active { display: flex; }
+  .rival-step-live { font-size: 13px; font-weight: 900; color: var(--gold); }
+  .rival-watch-sub { font-size: 11px; color: var(--muted); }
+  #btn-skip-rival {
+    padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(250, 204, 21, 0.5);
+    background: rgba(250, 204, 21, 0.16); color: var(--gold);
+    font-size: 11px; font-weight: 800; cursor: pointer;
+  }
+
+  /* PLAYER CONSOLE ZONE (TURNO 2 — MODALIDAD MODEL BOLIVIA 2026) */
+  #rhythm-zone {
+    max-width: 500px; width: 100%; align-self: center;
+    display: none; flex-direction: column; gap: 7px; pointer-events: auto;
+  }
+  #rhythm-zone.active { display: flex; }
+  #rhythm-track-wrap {
+    position: relative; width: 100%; height: 74px;
+    background: rgba(8, 12, 22, 0.90); border: 1.5px solid rgba(250, 204, 21, 0.48);
+    border-radius: 14px; overflow: hidden;
+  }
+  #rhythm-canvas { width: 100%; height: 100%; display: block; }
+
+  #overdrive-row { display: flex; align-items: center; gap: 8px; }
+  .step-active-pill {
+    font-size: 10px; font-weight: 800; color: var(--cream);
+    background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(250, 204, 21, 0.35);
+    border-radius: 9px; padding: 5px 9px; white-space: nowrap;
+  }
+  .flow-bar-wrap {
+    flex: 1; height: 11px; background: rgba(15, 23, 42, 0.9);
+    border-radius: 99px; border: 1px solid rgba(250, 204, 21, 0.45); overflow: hidden;
+  }
+  #flow-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--emerald-bright), var(--gold)); transition: width 0.15s ease; }
+  #btn-overdrive {
+    padding: 5px 11px; border-radius: 9px; border: 1px solid rgba(250, 204, 21, 0.45);
+    background: rgba(250, 204, 21, 0.16); color: var(--gold);
+    font-size: 10.5px; font-weight: 900; cursor: pointer; opacity: 0.55; white-space: nowrap;
+  }
+  #btn-overdrive.ready {
+    opacity: 1; background: linear-gradient(90deg, var(--gold), #fb923c);
+    color: #05120c; box-shadow: 0 0 18px rgba(250, 204, 21, 0.6);
+  }
+
+  .step-console-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px;
+  }
+  .step-pad {
+    min-height: 54px; border-radius: 12px; border: 1.5px solid rgba(255,255,255,0.2);
+    background: rgba(13, 19, 34, 0.94); color: #fff; padding: 5px 4px;
+    cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; text-align: center; transition: transform 0.06s ease, border-color 0.12s ease, background 0.12s ease;
+    position: relative;
+  }
+  .step-pad .sp-ico { font-size: 16px; line-height: 1; }
+  .step-pad .sp-lbl { font-size: 9.5px; font-weight: 800; line-height: 1.1; color: #f8fafc; }
+  .step-pad .sp-key { font-size: 8px; color: var(--muted); font-weight: 700; }
+  .step-pad.suggested {
+    border-color: var(--gold); background: rgba(250, 204, 21, 0.18);
+    box-shadow: 0 0 12px rgba(250, 204, 21, 0.35);
+  }
+  .step-pad.used { border-color: rgba(52, 211, 153, 0.55); }
+  .step-pad.pressed { transform: scale(0.93); background: rgba(52, 211, 153, 0.32); border-color: #fff; }
+
+  /* OVERLAYS / MODALS */
+  .modal-screen {
+    position: absolute; inset: 0; z-index: 50;
+    background: rgba(8, 10, 18, 0.86);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .modal-screen.hidden { display: none; }
+  .modal-box {
+    max-width: 430px; width: 100%; background: #0f1524;
+    border: 1.5px solid rgba(250, 204, 21, 0.55); border-radius: 22px;
+    padding: 22px 20px; text-align: center;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.72);
+  }
+  .flag-strip {
+    display: flex; height: 5px; border-radius: 99px; overflow: hidden; margin-bottom: 12px;
+  }
+  .flag-strip span { flex: 1; }
+  .brand-kicker {
+    display: inline-block; padding: 4px 10px; border-radius: 99px;
+    background: rgba(16, 185, 129, 0.2); color: var(--emerald-bright);
+    border: 1px solid rgba(52, 211, 153, 0.45);
+    font-size: 10px; font-weight: 800; letter-spacing: 0.9px; text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .modal-box h1 { font-size: 24px; font-weight: 900; line-height: 1.15; margin-bottom: 8px; color: var(--cream); }
+  .modal-box h2 { font-size: 21px; font-weight: 900; margin-bottom: 6px; color: var(--gold); }
+  .modal-box p { font-size: 13px; color: #cbd5e1; line-height: 1.45; margin-bottom: 14px; }
+  .feature-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 16px; }
+  .f-chip {
+    font-size: 11px; font-weight: 700; padding: 5px 9px; border-radius: 9px;
+    background: rgba(255,255,255,0.06); border: 1px solid rgba(250,204,21,0.22); color: #f1f5f9;
+  }
+  .couture-picker {
+    display: flex; justify-content: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .couture-opt {
+    padding: 6px 10px; border-radius: 10px; font-size: 11px; font-weight: 800;
+    background: rgba(255,255,255,0.06); color: #e2e8f0;
+    border: 1.5px solid rgba(255,255,255,0.16); cursor: pointer;
+  }
+  .couture-opt.active {
+    border-color: var(--gold); background: rgba(250, 204, 21, 0.22); color: var(--gold);
+  }
+  .primary-btn {
+    width: 100%; padding: 13px 18px; border-radius: 14px; border: none;
+    background: linear-gradient(90deg, var(--emerald-bright), var(--gold));
+    color: #05120c; font-size: 15px; font-weight: 900; letter-spacing: 0.4px;
+    cursor: pointer; margin-bottom: 8px;
+  }
+  .secondary-btn {
+    width: 100%; padding: 11px 16px; border-radius: 13px;
+    border: 1px solid rgba(255,255,255,0.22); background: rgba(255,255,255,0.06);
+    color: #fff; font-size: 13px; font-weight: 700; cursor: pointer;
+  }
+  .result-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 12px 0 16px;
+  }
+  .res-cell {
+    background: rgba(255,255,255,0.05); border: 1px solid rgba(250,204,21,0.22);
+    border-radius: 12px; padding: 8px 4px;
+  }
+  .res-cell small { display: block; font-size: 10px; color: var(--muted); }
+  .res-cell strong { font-size: 16px; color: var(--gold); }
+  #res-rank-badge {
+    width: 66px; height: 66px; border-radius: 18px; margin: 0 auto 10px;
+    background: linear-gradient(135deg, var(--gold), #f97316);
+    color: #05120c; font-size: 34px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* PAPARAZZI FLASH OVERLAY */
+  #paparazzi-flash {
+    position: absolute; inset: 0; z-index: 28; pointer-events: none;
+    background: radial-gradient(circle, rgba(255,250,220,0.45) 0%, rgba(255,255,255,0) 70%);
+    opacity: 0; transition: opacity 0.22s ease;
+  }
+  #paparazzi-flash.flash { opacity: 1; transition: opacity 0.04s ease; }
+
+  /* DRIVE MUSIC MODAL */
+  .music-input {
+    width: 100%; padding: 10px 12px; border-radius: 11px;
+    border: 1.5px solid rgba(250, 204, 21, 0.42); background: rgba(8, 12, 22, 0.95);
+    color: #fff; font-size: 12px; margin-bottom: 10px; outline: none;
+  }
+  .music-input:focus { border-color: var(--emerald-bright); }
+  .music-status {
+    font-size: 11px; color: var(--emerald-bright); background: rgba(16, 185, 129, 0.14);
+    border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 10px;
+    padding: 7px 10px; margin-bottom: 12px; line-height: 1.35; text-align: left;
+  }
+  .music-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .music-row button, .music-row label { flex: 1; }
+  .file-label-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    padding: 10px 12px; border-radius: 12px;
+    border: 1px solid rgba(250, 204, 21, 0.45); background: rgba(250, 204, 21, 0.14);
+    color: var(--gold); font-size: 12px; font-weight: 800; cursor: pointer;
+  }
+
+  /* LOGIN & ADMIN PANEL (FIREBASE REALTIME DB) */
+  .db-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 99px;
+    background: rgba(16, 185, 129, 0.16); border: 1px solid rgba(52, 211, 153, 0.4);
+    color: var(--emerald-bright); margin-bottom: 10px;
+  }
+  .db-badge.offline {
+    background: rgba(250, 204, 21, 0.16); border-color: rgba(250, 204, 21, 0.45); color: var(--gold);
+  }
+  .login-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; text-align: left; }
+  .login-row-chk {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    font-size: 11px; color: var(--muted);
+  }
+  .login-row-chk label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .login-msg {
+    font-size: 11px; font-weight: 700; min-height: 16px; color: #fda4af; text-align: center;
+  }
+  .user-role-tag {
+    display: inline-block; font-size: 9px; font-weight: 900; padding: 1px 6px;
+    border-radius: 6px; margin-left: 4px; vertical-align: middle;
+    background: rgba(250, 204, 21, 0.22); color: var(--gold); border: 1px solid rgba(250, 204, 21, 0.4);
+  }
+  .admin-box {
+    max-width: 520px; width: 100%; max-height: 88vh; overflow-y: auto;
+    background: #0f1524; border: 1.5px solid rgba(250, 204, 21, 0.55);
+    border-radius: 20px; padding: 18px 16px; text-align: left;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.78);
+  }
+  .admin-header {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 12px;
+  }
+  .admin-header h2 { font-size: 17px; margin: 0; color: var(--gold); }
+  .admin-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .admin-tab {
+    flex: 1; padding: 8px 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.16);
+    background: rgba(255,255,255,0.05); color: var(--muted); font-size: 11px; font-weight: 800; cursor: pointer;
+  }
+  .admin-tab.active {
+    background: rgba(16, 185, 129, 0.24); border-color: var(--emerald-bright); color: #fff;
+  }
+  .admin-pane { display: none; }
+  .admin-pane.active { display: block; }
+  .admin-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
+  .admin-list { display: flex; flex-direction: column; gap: 7px; max-height: 240px; overflow-y: auto; margin-bottom: 10px; }
+  .admin-card {
+    background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 12px; padding: 9px 10px; display: flex; flex-direction: column; gap: 6px;
+  }
+  .admin-card.banned { border-color: rgba(244, 63, 94, 0.55); }
+  .admin-card-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-size: 12px; font-weight: 800; }
+  .admin-card-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .mini-input {
+    background: rgba(8, 12, 22, 0.92); border: 1px solid rgba(255,255,255,0.2);
+    color: #fff; border-radius: 8px; padding: 5px 8px; font-size: 11px; flex: 1; min-width: 90px;
+  }
+  .mini-btn {
+    padding: 5px 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(16, 185, 129, 0.22); color: #fff; font-size: 10px; font-weight: 800; cursor: pointer;
+  }
+  .mini-btn.danger { background: rgba(244, 63, 94, 0.26); border-color: rgba(244, 63, 94, 0.55); }
+  .mini-btn.warn { background: rgba(250, 204, 21, 0.2); border-color: rgba(250, 204, 21, 0.5); color: var(--gold); }
+
+  /* BARRA DIRECTA DE FUNCIONES ADMIN EN PANTALLA */
+  #admin-dock {
+    position: absolute; top: 64px; left: 10px; z-index: 26;
+    display: none; flex-wrap: wrap; gap: 5px; max-width: 260px;
+    pointer-events: auto;
+  }
+  #admin-dock.visible { display: flex; }
+  .adm-dock-btn {
+    background: rgba(12, 16, 28, 0.94); border: 1px solid rgba(250, 204, 21, 0.48);
+    color: var(--gold); border-radius: 9px; padding: 5px 8px;
+    font-size: 10px; font-weight: 800; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 4px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.45);
+  }
+  .adm-dock-btn:active { transform: scale(0.95); }
+
+  /* CLEAN LIVE MODE (100% SEGURO PARA TRANSMISIÓN — OCULTA ADMIN Y DATOS DE CUENTA) */
+  body.live-clean #mission-banner,
+  body.live-clean .circuit-dots,
+  body.live-clean #btn-admin-panel,
+  body.live-clean #btn-logout,
+  body.live-clean #hud-user-tag { display: none !important; }
+
+  @media (min-width: 768px) {
+    #rhythm-track-wrap { height: 86px; }
+    .step-console-grid { grid-template-columns: repeat(6, 1fr); }
+    .step-pad { min-height: 56px; }
+  }
+</style>
+</head>
+<body>
+<div id="game-wrap">
+  <div id="webgl-container"></div>
+  <div id="paparazzi-flash"></div>
+
+  <!-- TOP HUD MINIMALISTA (SIN ANUNCIOS NI TEXTO EXTRA) -->
+  <div id="top-hud">
+    <div class="hud-card player-badge" style="padding:6px 10px;">
+      <div class="lvl-pill" style="width:32px; height:32px; font-size:13px;"><span>NV</span><div id="hud-level">1</div></div>
+      <div class="player-meta" style="min-width:96px;">
+        <div class="player-name"><span id="hud-rank-title">MODELO DEBUT</span></div>
+        <div class="xp-bar-bg"><div class="xp-bar-fill" id="hud-xp-fill"></div></div>
+        <div class="player-sub">
+          <span id="hud-doors-cleared">0/5</span>
+          <span id="hud-total-score">0 pts</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="top-right-group">
+      <div class="icon-row">
+        <button class="hud-btn" id="btn-outfit" title="Cambiar traje">👗</button>
+        <button class="hud-btn" id="btn-music-modal" title="Pista Drive / MP3">🎵</button>
+        <button class="hud-btn active" id="btn-sound" title="Audio">🔊</button>
+        <button class="hud-btn" id="btn-admin-panel" style="border-color:var(--gold); color:var(--gold);" title="Panel de Administración">👑 Admin</button>
+        <button class="hud-btn" id="btn-logout" style="display:none;" title="Salir">🚪</button>
+        <button class="hud-btn" id="btn-exit-battle" style="display:none;" title="Mapa">🗺️</button>
+      </div>
+      <div id="radar-box" style="width:92px; height:92px;">
+        <canvas id="radar-canvas" width="92" height="92"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- BARRA DIRECTA DE FUNCIONES ADMIN EN PANTALLA -->
+  <div id="admin-dock">
+    <button class="adm-dock-btn" data-open-tab="users">👥 Usuarios</button>
+    <button class="adm-dock-btn" data-open-tab="history">🏆 Batallas</button>
+    <button class="adm-dock-btn" data-open-tab="security">🛡️ Seguridad</button>
+    <button class="adm-dock-btn" data-open-tab="database">🔗 DB Externa</button>
+  </div>
+
+  <!-- DOOR INTERACTION PROMPT -->
+  <div id="door-prompt">
+    <div id="door-prompt-title">PUERTA 1 • PLAZA 24 DE SEPTIEMBRE</div>
+    <div id="door-prompt-sub">Rival: VALERIA "TAJIBO" • Taquirari Urbano 108 BPM</div>
+    <button id="btn-enter-door">ENTRAR A LA PASARELA ✨</button>
+  </div>
+
+  <!-- MAP CONTROLS -->
+  <div id="map-controls">
+    <div id="joystick-zone" aria-label="Control de movimiento">
+      <div id="joystick-knob"></div>
+    </div>
+    <div class="map-right-actions">
+      <button id="btn-autowalk">🧭 Puerta 1</button>
+    </div>
+  </div>
+
+  <!-- BATTLE UI LIMPIO (SIN ANUNCIOS FLOTANTES) -->
+  <div id="battle-ui">
+    <div id="battle-top">
+      <div class="vs-header">
+        <div class="fighter-tag" id="tag-player">
+          <span class="fighter-name" id="b-player-name">AURA MARFIL 24K</span>
+        </div>
+        <div class="battle-timer-box">
+          <div id="battle-timer">18</div>
+          <div id="battle-stage-name">PLAZA 24</div>
+        </div>
+        <div class="fighter-tag right spotlight" id="tag-rival">
+          <span class="fighter-name" id="b-rival-name">VALERIA "TAJIBO"</span>
+        </div>
+      </div>
+
+      <div class="jury-console">
+        <div class="jury-row">
+          <div class="jury-col">
+            <span class="jury-pill player" id="j-player-rhythm">TÚ --%</span>
+            <span style="color:var(--cream)" id="j-player-pts">0</span>
+          </div>
+          <div class="jury-col right">
+            <span style="color:var(--cream)" id="j-rival-pts">0</span>
+            <span class="jury-pill rival" id="j-rival-rhythm">RIVAL --%</span>
+          </div>
+        </div>
+        <div class="jury-bars">
+          <div class="j-bar-track"><div class="j-bar-fill-p" id="j-bar-p"></div></div>
+          <div class="j-bar-track"><div class="j-bar-fill-r" id="j-bar-r"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TURNO 1 COMPACTO -->
+    <div id="rival-watch-bar" style="padding:8px 12px; gap:6px; max-width:340px;">
+      <div class="rival-step-live" id="rival-step-live" style="font-size:12px;">💃 Pasarela Catwalk</div>
+      <button id="btn-skip-rival">⏭️ Mi turno</button>
+    </div>
+
+    <!-- TURNO 2: CONSOLA DE PASOS MODEL BOLIVIA 2026 -->
+    <div id="rhythm-zone">
+      <div id="rhythm-track-wrap" style="height:58px;">
+        <canvas id="rhythm-canvas"></canvas>
+      </div>
+      <div id="overdrive-row">
+        <div class="step-active-pill" id="active-step-pill">0x</div>
+        <div class="flow-bar-wrap"><div id="flow-fill"></div></div>
+        <button id="btn-overdrive">✨ 0%</button>
+      </div>
+      <div class="step-console-grid" id="step-console-grid"></div>
+    </div>
+  </div>
+
+  <!-- LOGIN & START SCREEN -->
+  <div class="modal-screen" id="start-modal">
+    <div class="modal-box">
+      <div class="flag-strip">
+        <span style="background:#007934"></span>
+        <span style="background:#ffffff"></span>
+        <span style="background:#007934"></span>
+        <span style="background:#d52b1e"></span>
+        <span style="background:#f9e300"></span>
+        <span style="background:#007934"></span>
+      </div>
+      <h1>URBAN BEAT CAMBA 3D</h1>
+      <div class="login-form">
+        <input type="text" class="music-input" id="login-username" placeholder="Usuario o cuenta Admin" style="margin-bottom:0;" autocomplete="username" />
+        <input type="password" class="music-input" id="login-password" placeholder="Contraseña (mín. 6 caracteres)" style="margin-bottom:0;" autocomplete="current-password" />
+        <div class="login-row-chk">
+          <label><input type="checkbox" id="chk-remember-session" checked /> Recordar sesión</label>
+        </div>
+        <div class="login-msg" id="login-msg"></div>
+      </div>
+
+      <div class="couture-picker" id="start-couture-picker">
+        <button class="couture-opt active" data-outfit="0">👗 Marfil 24K</button>
+        <button class="couture-opt" data-outfit="1">💚 Esmeralda</button>
+        <button class="couture-opt" data-outfit="2">🌸 Tajibo</button>
+        <button class="couture-opt" data-outfit="3">🏛️ Chiquitana</button>
+        <button class="couture-opt" data-outfit="4">🔥 Tinku</button>
+        <button class="couture-opt" data-outfit="5">💎 Morenada</button>
+      </div>
+      <button class="primary-btn" id="btn-start-game">INGRESAR ▶</button>
+      <button class="secondary-btn" id="btn-guest-login" style="padding:9px 12px; font-size:12px;">⚡ Invitado</button>
+    </div>
+  </div>
+
+  <!-- GOOGLE DRIVE / MP3 MUSIC MODAL -->
+  <div class="modal-screen hidden" id="music-modal">
+    <div class="modal-box">
+      <div class="brand-kicker">🎵 Música de Pasarela • Google Drive / MP3</div>
+      <h2>PISTA PARA LOS TURNOS</h2>
+      <p>Pega el enlace compartido de tu audio en Google Drive (con acceso "Cualquier persona con el enlace") o carga un MP3 desde tu dispositivo. Sonará al iniciar cada turno en pasarela.</p>
+      <input type="text" class="music-input" id="drive-url-input" placeholder="https://drive.google.com/file/d/TU_ID/view?usp=sharing" />
+      <div class="music-status" id="music-status-box">Estado: Usando ritmos bolivianos originales (sin pista externa).</div>
+      <div class="music-row">
+        <button class="primary-btn" id="btn-save-drive-audio" style="margin-bottom:0; padding:10px 12px; font-size:12px;">💾 Guardar Drive</button>
+        <label class="file-label-btn">📂 Cargar MP3<input type="file" id="local-audio-file" accept="audio/*" style="display:none;" /></label>
+      </div>
+      <div class="music-row">
+        <button class="secondary-btn" id="btn-test-track" style="padding:9px 10px; font-size:12px;">▶️ Probar Pista</button>
+        <button class="secondary-btn" id="btn-clear-track" style="padding:9px 10px; font-size:12px;">🔄 Usar Synth Camba</button>
+      </div>
+      <div style="background:rgba(255,255,255,0.05); border:1px solid rgba(250,204,21,0.28); border-radius:12px; padding:10px; margin-bottom:10px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:800; color:var(--gold); margin-bottom:6px;">
+          <span>🥁 SINCRONIZAR TEMPO (BPM)</span>
+          <span id="bpm-display">AUTO (según pasarela)</span>
+        </div>
+        <input type="range" id="bpm-slider" min="72" max="175" value="120" style="width:100%; accent-color:#34d399; margin-bottom:8px;" />
+        <div class="music-row" style="margin-bottom:0;">
+          <button class="secondary-btn" id="btn-tap-tempo" style="padding:7px 8px; font-size:11px; border-color:rgba(250,204,21,0.45); color:var(--gold);">👆 Tap Tempo</button>
+          <button class="secondary-btn" id="btn-bpm-auto" style="padding:7px 8px; font-size:11px;">♻️ Auto BPM</button>
+        </div>
+      </div>
+      <button class="secondary-btn" id="btn-close-music">CERRAR</button>
+    </div>
+  </div>
+
+  <!-- PANEL DE ADMINISTRACIÓN & BASE DE DATOS FIREBASE -->
+  <div class="modal-screen hidden" id="admin-modal">
+    <div class="admin-box">
+      <div class="admin-header">
+        <h2>👑 Panel de Administración • Firebase DB</h2>
+        <button class="hud-btn" id="btn-close-admin">✕ Cerrar</button>
+      </div>
+      <div class="admin-tabs">
+        <button class="admin-tab active" data-tab="users">👥 Usuarios</button>
+        <button class="admin-tab" data-tab="history">🏆 Batallas</button>
+        <button class="admin-tab" data-tab="security">🛡️ Seguridad</button>
+        <button class="admin-tab" data-tab="database">🔗 DB Externa</button>
+      </div>
+
+      <!-- TAB 1: USUARIOS Y ROLES -->
+      <div class="admin-pane active" id="admin-pane-users">
+        <div class="admin-form-grid">
+          <input type="text" class="mini-input" id="adm-new-user" placeholder="Nuevo @usuario o correo" />
+          <input type="password" class="mini-input" id="adm-new-pass" placeholder="Contraseña" />
+        </div>
+        <div class="music-row" style="margin-bottom:10px;">
+          <select class="mini-input" id="adm-new-role">
+            <option value="player">💃 Jugadora (Player)</option>
+            <option value="subadmin" id="adm-opt-subadmin">🎧 Moderador (SubAdmin)</option>
+          </select>
+          <button class="primary-btn" id="btn-adm-create-user" style="margin:0; padding:7px 10px; font-size:11px;">+ Crear Cuenta</button>
+        </div>
+        <div class="music-status" id="adm-users-msg" style="margin-bottom:8px;">Gestiona cuentas, contraseñas y acceso al circuito.</div>
+        <div class="admin-list" id="adm-users-list"></div>
+      </div>
+
+      <!-- TAB 2: HISTORIAL DE PASARELAS EN BASE DE DATOS -->
+      <div class="admin-pane" id="admin-pane-history">
+        <div class="music-status" id="adm-history-summary">Cargando historial de pasarelas desde Firebase...</div>
+        <div id="adm-top10-box" style="margin-bottom:10px;"></div>
+        <div class="admin-list" id="adm-history-list"></div>
+      </div>
+
+      <!-- TAB 3: AUDITORÍA Y SEGURIDAD EN BASE DE DATOS -->
+      <div class="admin-pane" id="admin-pane-security">
+        <div class="music-status" id="adm-sec-summary">Registro verificado de accesos y cambios administrativos (SHA-256 activo).</div>
+        <div class="admin-list" id="adm-sec-list"></div>
+      </div>
+
+      <!-- TAB 4: NUEVA BASE DE DATOS EXTERNA (PROYECTO FIREBASE PROPIO) -->
+      <div class="admin-pane" id="admin-pane-database">
+        <div class="music-status" id="adm-db-status">Sin credenciales de proyecto nuevo configuradas (usando respaldo local).</div>
+        <div class="admin-form-grid">
+          <input type="text" class="mini-input" id="adm-fb-apikey" placeholder="apiKey de tu nuevo Firebase" />
+          <input type="text" class="mini-input" id="adm-fb-projectid" placeholder="projectId (ej: urban-beat-bo)" />
+        </div>
+        <input type="text" class="music-input" id="adm-fb-dburl" placeholder="databaseURL (https://tu-nuevo-proyecto-default-rtdb.firebaseio.com/)" style="margin-bottom:8px;" />
+        <input type="text" class="music-input" id="adm-db-namespace" placeholder="Ruta raíz (ej: urban_beat_camba_db)" style="margin-bottom:8px;" />
+        <div class="music-row">
+          <button class="primary-btn" id="btn-adm-save-ns" style="margin:0; padding:9px; font-size:11px;">💾 Conectar Nueva DB</button>
+          <button class="secondary-btn" id="btn-adm-sync-now" style="padding:9px; font-size:11px;">🔄 Sincronizar</button>
+        </div>
+        <button class="secondary-btn" id="btn-adm-export-json" style="padding:9px; font-size:11px;">📋 Descargar Respaldo JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAMBIO OBLIGATORIO DE CONTRASEÑA INICIAL DE ADMINISTRADOR -->
+  <div class="modal-screen hidden" id="force-pass-modal">
+    <div class="modal-box">
+      <div class="brand-kicker">🔐 Seguridad Obligatoria</div>
+      <h2>CAMBIA TU CONTRASEÑA ADMIN</h2>
+      <p>Por seguridad, debes reemplazar la clave inicial antes de ingresar. La nueva clave se guardará cifrada (SHA-256) en tu base de datos y la clave inicial quedará desactivada.</p>
+      <div class="login-form">
+        <input type="password" class="music-input" id="fp-new-pass" placeholder="Nueva contraseña segura (mín. 8 caracteres)" style="margin-bottom:0;" autocomplete="new-password" />
+        <input type="password" class="music-input" id="fp-confirm-pass" placeholder="Confirmar nueva contraseña" style="margin-bottom:0;" autocomplete="new-password" />
+        <div class="login-msg" id="fp-msg"></div>
+      </div>
+      <button class="primary-btn" id="btn-save-force-pass">GUARDAR NUEVA CLAVE Y ENTRAR 🔐</button>
+    </div>
+  </div>
+
+  <!-- BATTLE RESULT / VEREDICTO DEL JURADO MODAL -->
+  <div class="modal-screen hidden" id="result-modal">
+    <div class="modal-box">
+      <div class="brand-kicker" id="res-kicker">VEREDICTO DE CONSOLA • RITMO</div>
+      <div id="res-rank-badge">S</div>
+      <h2 id="res-title">¡GANASTE POR MEJOR RITMO!</h2>
+      <p id="res-desc">La consola te eligió vencedora de la pasarela.</p>
+      <div class="result-grid">
+        <div class="res-cell"><small>TU RITMO</small><strong id="res-player-rhythm">0%</strong></div>
+        <div class="res-cell"><small>RITMO RIVAL</small><strong id="res-rival-rhythm" style="color:#fda4af">0%</strong></div>
+        <div class="res-cell"><small>TU PUNTAJE / COMBO</small><strong id="res-score">0</strong></div>
+        <div class="res-cell"><small>VARIEDAD DE PASOS</small><strong id="res-variety">0/12</strong></div>
+      </div>
+      <button class="primary-btn" id="btn-res-primary">VOLVER A SANTA CRUZ 🗺️</button>
+      <button class="secondary-btn" id="btn-res-secondary">REPETIR PASARELA</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // =========================================================================
+  // 0. BASE DE DATOS EXTERNA FIREBASE REALTIME DB + SEGURIDAD SHA-256 & AUDITORÍA
+  // =========================================================================
+  // =========================================================================
+  // CONFIGURACIÓN DE TU NUEVO PROYECTO FIREBASE INDEPENDIENTE (SEPARADO)
+  // Pega aquí las credenciales de tu NUEVA base de datos Firebase antes de
+  // subir a GitHub Pages, o configúralas desde 👑 Admin -> 🔗 DB Externa.
+  // =========================================================================
+  let EXTERNAL_DB_CONFIG = {
+    apiKey: "",
+    authDomain: "",
+    databaseURL: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: ""
+  };
+
+  // Cargar credenciales guardadas desde el panel Admin si existen
+  try {
+    const savedCfg = JSON.parse(localStorage.getItem('ubc_custom_fb_config') || 'null');
+    if (savedCfg && savedCfg.databaseURL && savedCfg.apiKey) {
+      EXTERNAL_DB_CONFIG = Object.assign(EXTERNAL_DB_CONFIG, savedCfg);
+    }
+  } catch (e) {}
+
+  let database = null;
+  let dbConnected = false;
+
+  function initExternalFirebase() {
+    database = null;
+    dbConnected = false;
+    if (typeof firebase === 'undefined' || !EXTERNAL_DB_CONFIG.databaseURL || !EXTERNAL_DB_CONFIG.apiKey) {
+      setDbBadge(false, 'Proyecto Firebase nuevo pendiente de credenciales (respaldo local activo)');
+      return false;
+    }
+    try {
+      const appName = 'ubc_ext_' + Date.now();
+      const app = firebase.initializeApp(EXTERNAL_DB_CONFIG, appName);
+      database = app.database();
+      database.ref('.info/connected').on('value', (snap) => {
+        const isLive = snap.val() === true;
+        setDbBadge(isLive, isLive ? ('🟢 Conectado a ' + (EXTERNAL_DB_CONFIG.projectId || 'Firebase')) : '🟡 Sin conexión externa (Respaldo Local)');
+      });
+      return true;
+    } catch (e) {
+      setDbBadge(false, 'Error al conectar credenciales Firebase (revisa databaseURL y apiKey)');
+      return false;
+    }
+  }
+  let DB_NAMESPACE = 'urban_beat_camba_v1_db';
+  try {
+    DB_NAMESPACE = localStorage.getItem('ubc_db_namespace') || 'urban_beat_camba_v1_db';
+  } catch (e) {}
+
+  initExternalFirebase();
+
+  const SUPER_ADMIN_EMAIL = 'copauyunifreddy@gmail.com';
+  const BOOTSTRAP_SALT = 'ubc2026_boot_9f3a7c';
+  const BOOTSTRAP_SHA256 = '5d333455251c0583e65a48bb541858a3d5389d0de87462e83630c6fc9e037e45';
+  const BOOTSTRAP_FALLBACK = 'af44ba0b5f0d4ec1';
+
+  let usersDB = [];
+  let battleHistoryDB = [];
+  let pendingForcePassUser = null;
+  let securityLogsDB = [];
+  let currentUser = '';
+  let currentUserRole = 'guest'; // 'admin' | 'subadmin' | 'player' | 'guest'
+  let failedLoginCount = 0;
+  let loginLockUntil = 0;
+
+  function sanitizeKey(str) {
+    return String(str || 'guest').toLowerCase().replace(/[.#$[\]\/\s]/g, '_');
+  }
+
+  function safeDisplayAlias(rawName) {
+    const s = String(rawName || 'Invitado').trim();
+    if (s.includes('@') && s.indexOf('@') > 0) {
+      // Nunca exponer correos completos en pantalla durante transmisiones
+      return '@' + s.split('@')[0].slice(0, 14);
+    }
+    return s.slice(0, 18);
+  }
+
+  function normalizeList(raw) {
+    if (!raw) return [];
+    return Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+  }
+
+  function generateSalt() {
+    const arr = new Uint8Array(12);
+    if (window.crypto && window.crypto.getRandomValues) {
+      window.crypto.getRandomValues(arr);
+    } else {
+      for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
+    }
+    return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Hash criptográfico SHA-256 con salt (nunca se guardan contraseñas en texto plano)
+  async function hashPassword(plain, salt) {
+    const input = String(salt) + '::UBC2026::' + String(plain);
+    if (window.crypto && window.crypto.subtle) {
+      const data = new TextEncoder().encode(input);
+      const buf = await window.crypto.subtle.digest('SHA-256', data);
+      return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+    }
+    // Respaldo determinístico seguro para WebViews sin contexto HTTPS
+    let h1 = 0xdeadbeef ^ input.length, h2 = 0x41c6ce57 ^ input.length;
+    for (let i = 0; i < input.length; i++) {
+      const ch = input.charCodeAt(i);
+      h1 = Math.imul(h1 ^ ch, 2654435761);
+      h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+  }
+
+  function setDbBadge(online, text) {
+    dbConnected = online;
+    const admSt = document.getElementById('adm-db-status');
+    if (admSt) {
+      admSt.textContent = text + ' • Ruta: /' + DB_NAMESPACE;
+    }
+  }
+
+  function ensureBootstrapAdmin(list) {
+    const arr = normalizeList(list).filter((u) => u && u.name && (u.passHash || u.isBootstrap));
+    let adm = arr.find((u) => u.name.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase());
+    if (!adm) {
+      adm = {
+        name: SUPER_ADMIN_EMAIL,
+        alias: safeDisplayAlias(SUPER_ADMIN_EMAIL),
+        salt: BOOTSTRAP_SALT,
+        passHash: BOOTSTRAP_SHA256,
+        fallbackHash: BOOTSTRAP_FALLBACK,
+        role: 'admin',
+        hasGameAccess: true,
+        canCreateSubAdmins: true,
+        mustChangePassword: true,
+        createdAt: Date.now()
+      };
+      arr.unshift(adm);
+    }
+    return arr;
+  }
+
+  function updateLoginModeHint() {
+    const btn = document.getElementById('btn-start-game');
+    if (btn) btn.textContent = 'INGRESAR ▶';
+  }
+
+  async function logSecurityEvent(eventType, actor, details) {
+    const entry = {
+      event: String(eventType),
+      actor: safeDisplayAlias(actor || currentUser || 'Sistema'),
+      details: String(details || ''),
+      timestamp: Date.now()
+    };
+    securityLogsDB.unshift(entry);
+    if (securityLogsDB.length > 50) securityLogsDB = securityLogsDB.slice(0, 50);
+    try { localStorage.setItem('ubc_seclogs_fallback', JSON.stringify(securityLogsDB)); } catch (e) {}
+    if (database) {
+      database.ref(DB_NAMESPACE + '/securityLogs').set(securityLogsDB).catch(() => {});
+    }
+  }
+
+  async function loadSecurityLogsFromDB() {
+    try {
+      securityLogsDB = normalizeList(JSON.parse(localStorage.getItem('ubc_seclogs_fallback') || '[]'));
+    } catch (e) { securityLogsDB = []; }
+    if (!database) return securityLogsDB;
+    await new Promise((resolve) => {
+      let done = false;
+      setTimeout(() => { if (!done) { done = true; resolve(); } }, 1500);
+      database.ref(DB_NAMESPACE + '/securityLogs').once('value').then((snap) => {
+        if (!done) {
+          done = true;
+          const list = normalizeList(snap.val());
+          if (list.length) securityLogsDB = list;
+          resolve();
+        }
+      }).catch(() => { if (!done) { done = true; resolve(); } });
+    });
+    return securityLogsDB;
+  }
+
+  async function loadUsersFromDB() {
+    return new Promise((resolve) => {
+      let done = false;
+      const finish = (list, online) => {
+        if (done) return;
+        done = true;
+        usersDB = ensureBootstrapAdmin(list);
+        try { localStorage.setItem('ubc_users_sec_fallback', JSON.stringify(usersDB)); } catch (e) {}
+        if (!dbConnected) {
+          setDbBadge(online, online ? '🟢 Firebase Conectado (En Vivo)' : '🟡 Sin conexión externa (Respaldo Local)');
+        }
+        updateLoginModeHint();
+        resolve(usersDB);
+      };
+
+      const readLocal = () => {
+        try {
+          return JSON.parse(localStorage.getItem('ubc_users_sec_fallback') || '[]');
+        } catch (e) { return []; }
+      };
+
+      setTimeout(() => finish(readLocal(), false), 1800);
+
+      if (!database) { finish(readLocal(), false); return; }
+      database.ref(DB_NAMESPACE + '/users').once('value').then((snap) => {
+        const val = snap.val();
+        finish(val || readLocal(), true);
+      }).catch(() => finish(readLocal(), false));
+    });
+  }
+
+  async function saveUsersToDB() {
+    try { localStorage.setItem('ubc_users_sec_fallback', JSON.stringify(usersDB)); } catch (e) {}
+    if (!database) return false;
+    try {
+      await database.ref(DB_NAMESPACE + '/users').set(usersDB);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  async function saveGameProgressToDB() {
+    if (!currentUser || currentUserRole === 'guest') return;
+    const key = sanitizeKey(currentUser);
+    const payload = {
+      alias: safeDisplayAlias(currentUser),
+      role: currentUserRole,
+      level: state.level,
+      outfitIndex: state.outfitIndex,
+      cleared: state.cleared,
+      bestRanks: state.bestRanks,
+      totalScore: state.totalScore,
+      updatedAt: Date.now()
+    };
+    try { localStorage.setItem('ubc_prog_' + key, JSON.stringify(payload)); } catch (e) {}
+    if (database) {
+      database.ref(DB_NAMESPACE + '/progress/' + key).set(payload).catch(() => {});
+    }
+  }
+
+  async function loadGameProgressFromDB(username) {
+    const key = sanitizeKey(username);
+    const applyProg = (p) => {
+      if (!p) return;
+      state.level = Math.max(1, Math.min(STAGES.length, Number(p.level) || 1));
+      state.outfitIndex = Math.max(0, Math.min(PLAYER_OUTFITS.length - 1, Number(p.outfitIndex) || 0));
+      if (Array.isArray(p.cleared) && p.cleared.length === STAGES.length) state.cleared = p.cleared.map(Boolean);
+      if (Array.isArray(p.bestRanks) && p.bestRanks.length === STAGES.length) state.bestRanks = p.bestRanks.map(String);
+      state.totalScore = Number(p.totalScore) || 0;
+      document.querySelectorAll('.couture-opt').forEach((b, i) => b.classList.toggle('active', i === state.outfitIndex));
+    };
+
+    try {
+      const localP = JSON.parse(localStorage.getItem('ubc_prog_' + key) || 'null');
+      if (localP) applyProg(localP);
+    } catch (e) {}
+
+    if (!database) return;
+    await new Promise((resolve) => {
+      let done = false;
+      setTimeout(() => { if (!done) { done = true; resolve(); } }, 1500);
+      database.ref(DB_NAMESPACE + '/progress/' + key).once('value').then((snap) => {
+        if (!done) {
+          done = true;
+          if (snap.val()) applyProg(snap.val());
+          resolve();
+        }
+      }).catch(() => { if (!done) { done = true; resolve(); } });
+    });
+  }
+
+  function recordBattleToDB(record) {
+    const cleanRec = Object.assign({}, record, { user: safeDisplayAlias(record.user) });
+    battleHistoryDB.unshift(cleanRec);
+    if (battleHistoryDB.length > 40) battleHistoryDB = battleHistoryDB.slice(0, 40);
+    try { localStorage.setItem('ubc_battles_fallback', JSON.stringify(battleHistoryDB)); } catch (e) {}
+    if (database) {
+      database.ref(DB_NAMESPACE + '/battles').set(battleHistoryDB).catch(() => {});
+    }
+  }
+
+  async function loadBattleHistoryFromDB() {
+    try {
+      battleHistoryDB = normalizeList(JSON.parse(localStorage.getItem('ubc_battles_fallback') || '[]'));
+    } catch (e) { battleHistoryDB = []; }
+    if (!database) return battleHistoryDB;
+    await new Promise((resolve) => {
+      let done = false;
+      setTimeout(() => { if (!done) { done = true; resolve(); } }, 1500);
+      database.ref(DB_NAMESPACE + '/battles').once('value').then((snap) => {
+        if (!done) {
+          done = true;
+          const list = normalizeList(snap.val());
+          if (list.length) battleHistoryDB = list;
+          resolve();
+        }
+      }).catch(() => { if (!done) { done = true; resolve(); } });
+    });
+    return battleHistoryDB;
+  }
+
+  function saveSharedMusicToDB(rawUrl) {
+    const payload = {
+      driveMusicUrl: rawUrl || '',
+      updatedBy: safeDisplayAlias(currentUser || 'Invitado'),
+      updatedAt: Date.now()
+    };
+    if (database) {
+      database.ref(DB_NAMESPACE + '/settings/music').set(payload).catch(() => {});
+    }
+    logSecurityEvent('MUSIC_UPDATE', currentUser, rawUrl ? 'Pista externa actualizada' : 'Restaurado synth original');
+  }
+
+  async function loadSharedMusicFromDB() {
+    if (!database) return;
+    try {
+      const snap = await database.ref(DB_NAMESPACE + '/settings/music').once('value');
+      const val = snap.val();
+      if (val && val.driveMusicUrl) {
+        const parsed = parseDriveAudioUrl(val.driveMusicUrl);
+        if (parsed) {
+          audio.setCustomTrack(parsed.primary, parsed.label, parsed.fallback);
+          const inp = document.getElementById('drive-url-input');
+          if (inp) inp.value = val.driveMusicUrl;
+          updateMusicStatusUI('Pista sincronizada desde DB (' + parsed.label + ').', true);
+        }
+      }
+    } catch (e) {}
+  }
+
+  // =========================================================================
+  // 1. CIRCUITO BOLIVIANO CAMBA (5 PASARELAS & 5 RIVALES ALTA MODA FEMENINA)
+  // =========================================================================
+  const PLAYER_OUTFITS = [
+    {
+      name: 'AURA MARFIL 24K',
+      skin: 0xf2c2a2, iris: '#0d9488', lip: '#d6336c',
+      hair: 0x26150c, hairStyle: 'hollywood',
+      primary: 0xfef3c7, secondary: 0xf59e0b, tulle: 0xfda4af,
+      accent: 0xfacc15, silhouette: 'mermaid', crown: 'tiara'
+    },
+    {
+      name: 'ESMERALDA CAMBA',
+      skin: 0xebb490, iris: '#059669', lip: '#be123c',
+      hair: 0x1a0f08, hairStyle: 'ponytail',
+      primary: 0x059669, secondary: 0xfacc15, tulle: 0x6ee7b7,
+      accent: 0x34d399, silhouette: 'aline', crown: 'diadem'
+    },
+    {
+      name: 'TAJIBO COUTURE',
+      skin: 0xf6cab0, iris: '#7c3aed', lip: '#e11d48',
+      hair: 0x3b1f10, hairStyle: 'side_wave',
+      primary: 0xdb2777, secondary: 0xfef08a, tulle: 0xf9a8d4,
+      accent: 0xf43f5e, silhouette: 'peplum', crown: 'halo'
+    },
+    {
+      name: 'CHIQUITANA COUTURE',
+      skin: 0xeeb893, iris: '#b45309', lip: '#be123c',
+      hair: 0x1d110a, hairStyle: 'chignon',
+      primary: 0xc2410c, secondary: 0xfef08a, tulle: 0xfdba74,
+      accent: 0xfb923c, silhouette: 'aline', crown: 'tajibo_tiara'
+    },
+    {
+      name: 'TINKU COUTURE',
+      skin: 0xe6ac85, iris: '#991b1b', lip: '#dc2626',
+      hair: 0x140c08, hairStyle: 'ponytail',
+      primary: 0x991b1b, secondary: 0xfacc15, tulle: 0xfca5a5,
+      accent: 0xef4444, silhouette: 'peplum', crown: 'imperial'
+    },
+    {
+      name: 'MORENADA GLAM',
+      skin: 0xf4c4a4, iris: '#4338ca', lip: '#c026d3',
+      hair: 0x20130c, hairStyle: 'hollywood',
+      primary: 0x312e81, secondary: 0xfde047, tulle: 0xa5b4fc,
+      accent: 0x818cf8, silhouette: 'mermaid', crown: 'imperial'
+    }
+  ];
+
+  const STAGES = [
+    {
+      id: 0, levelReq: 1, name: 'Plaza 24 de Septiembre', short: 'Plaza 24',
+      rival: 'VALERIA "TAJIBO"', style: 'Taquirari Urbano', bpm: 108, duration: 42,
+      difficulty: 0.72, doorPos: { x: 0, z: -22 },
+      accent: 0x10b981, accentHex: '#34d399', sky: 0x2a1d38, floor: 0x2c2420,
+      theme: 'plaza24',
+      rivalModel: {
+        skin: 0xf1be9b, iris: '#10b981', lip: '#e11d48',
+        hair: 0x1e110a, hairStyle: 'hollywood',
+        primary: 0x047857, secondary: 0xfacc15, tulle: 0xf472b6,
+        accent: 0x34d399, silhouette: 'aline', crown: 'tajibo_tiara'
+      },
+      notesRate: 1.0, chordRoot: 130.81, rhythmKind: 'taquirari'
+    },
+    {
+      id: 1, levelReq: 2, name: 'Bulevar Equipetrol', short: 'Equipetrol',
+      rival: 'CAMILA "SOLÉ"', style: 'Chovena Electropop', bpm: 116, duration: 45,
+      difficulty: 0.78, doorPos: { x: 24, z: -10 },
+      accent: 0xf43f5e, accentHex: '#fb7185', sky: 0x1d1630, floor: 0x1e2230,
+      theme: 'equipetrol',
+      rivalModel: {
+        skin: 0xe5a882, iris: '#9f1239', lip: '#be123c',
+        hair: 0x120c0b, hairStyle: 'chignon',
+        primary: 0xbe123c, secondary: 0xfacc15, tulle: 0xfda4af,
+        accent: 0xf43f5e, silhouette: 'mermaid', crown: 'tiara'
+      },
+      notesRate: 1.15, chordRoot: 146.83, rhythmKind: 'chovena'
+    },
+    {
+      id: 2, levelReq: 3, name: 'Mirador Cristo Redentor', short: 'Cristo Red.',
+      rival: 'LUCIANA "ILLIMANI"', style: 'Caporal Beat', bpm: 124, duration: 48,
+      difficulty: 0.83, doorPos: { x: -24, z: -6 },
+      accent: 0x38bdf8, accentHex: '#38bdf8', sky: 0x181c36, floor: 0x1b2134,
+      theme: 'cristo',
+      rivalModel: {
+        skin: 0xf5c8ad, iris: '#0284c7', lip: '#db2777',
+        hair: 0xd4a348, hairStyle: 'side_wave',
+        primary: 0x1d4ed8, secondary: 0xe2e8f0, tulle: 0x7dd3fc,
+        accent: 0x38bdf8, silhouette: 'palazzo', crown: 'diadem'
+      },
+      notesRate: 1.32, chordRoot: 110.00, rhythmKind: 'caporal'
+    },
+    {
+      id: 3, levelReq: 4, name: 'Jardines del Urubó', short: 'Urubó VIP',
+      rival: 'SOFÍA "ORQUÍDEA"', style: 'Carnavalito Trap', bpm: 130, duration: 50,
+      difficulty: 0.88, doorPos: { x: 22, z: 22 },
+      accent: 0xc084fc, accentHex: '#c084fc', sky: 0x241335, floor: 0x22192e,
+      theme: 'urubo',
+      rivalModel: {
+        skin: 0xdfa17c, iris: '#7e22ce', lip: '#c026d3',
+        hair: 0x24110b, hairStyle: 'ponytail',
+        primary: 0x7e22ce, secondary: 0xfacc15, tulle: 0xe9d5ff,
+        accent: 0xc084fc, silhouette: 'peplum', crown: 'halo'
+      },
+      notesRate: 1.48, chordRoot: 164.81, rhythmKind: 'carnavalito'
+    },
+    {
+      id: 4, levelReq: 5, name: 'Gran Pasarela Cambódromo', short: 'CAMBÓDROMO',
+      rival: 'ISABELLA "REINA 24K"', style: 'Gala Camba 24K', bpm: 138, duration: 55,
+      difficulty: 0.92, doorPos: { x: -20, z: 24 },
+      accent: 0xfacc15, accentHex: '#facc15', sky: 0x2b1426, floor: 0x24191e,
+      theme: 'cambodromo',
+      rivalModel: {
+        skin: 0xf7cdb5, iris: '#b45309', lip: '#dc2626',
+        hair: 0x190e09, hairStyle: 'hollywood',
+        primary: 0xd97706, secondary: 0xfffbeb, tulle: 0xfef08a,
+        accent: 0xfacc15, silhouette: 'mermaid', crown: 'imperial'
+      },
+      notesRate: 1.65, chordRoot: 123.47, rhythmKind: 'gala24k'
+    }
+  ];
+
+  const RANK_TITLES = ['MODELO DEBUT', 'MUSA CRUCEÑA', 'DIVA EQUIPETROL', 'ESTRELLA BOLIVIA', 'REINA ALTA MODA 24K'];
+
+  // 12 PASOS DE PASARELA MODALIDAD MODEL BOLIVIA 2026
+  const RUNWAY_STEPS = [
+    { id: 0,  anim: 'catwalk',    name: 'Pasarela Catwalk',      short: 'Catwalk',     emoji: '💃', key: 'A', num: '1', color: '#34d399' },
+    { id: 1,  anim: 'vogue',      name: 'Pose Vogue Editorial',  short: 'Pose Vogue',  emoji: '📸', key: 'S', num: '2', color: '#facc15' },
+    { id: 2,  anim: 'pirouette',  name: 'Pirueta 360° Fouetté',  short: 'Giro 360°',   emoji: '🌀', key: 'W', num: '3', color: '#c084fc' },
+    { id: 3,  anim: 'taquirari',  name: 'Paso Taquirari Camba',  short: 'Taquirari',   emoji: '🇧🇴', key: 'D', num: '4', color: '#f43f5e' },
+    { id: 4,  anim: 'caporal',    name: 'Salto Caporal 360°',    short: 'Caporal',     emoji: '🥁', key: 'Q', num: '5', color: '#fb923c' },
+    { id: 5,  anim: 'slide',      name: 'Slide Pasarela VIP',    short: 'Slide VIP',   emoji: '✨', key: 'E', num: '6', color: '#38bdf8' },
+    { id: 6,  anim: 'gala_bow',   name: 'Reverencia Gala 24K',   short: 'Gala 24K',    emoji: '👑', key: 'R', num: '7', color: '#fde047' },
+    { id: 7,  anim: 'arabesque',  name: 'Balanza Arabesque',     short: 'Arabesque',   emoji: '🌟', key: 'F', num: '8', color: '#f472b6' },
+    { id: 8,  anim: 'chovena',    name: 'Chovena Brisa Oriental',short: 'Chovena',     emoji: '🌴', key: 'Z', num: '9', color: '#2dd4bf' },
+    { id: 9,  anim: 'tinku',      name: 'Zapateo Tinku Potosí',  short: 'Tinku',       emoji: '🔥', key: 'X', num: '0', color: '#f87171' },
+    { id: 10, anim: 'morenada',   name: 'Giro Morenada Imperial',short: 'Morenada',    emoji: '💎', key: 'C', num: '-', color: '#818cf8' },
+    { id: 11, anim: 'chiquitano', name: 'Abánico Chiquitano',    short: 'Chiquitano',  emoji: '🏛️', key: 'V', num: '=', color: '#fbbf24' }
+  ];
+
+  // =========================================================================
+  // 2. GAME STATE
+  // =========================================================================
+  const state = {
+    mode: 'title',
+    level: 1,
+    outfitIndex: 0,
+    manualBpm: null,
+    cleared: [false, false, false, false, false],
+    bestRanks: ['', '', '', '', ''],
+    totalScore: 0,
+    soundOn: true,
+    liveClean: false,
+    autoWalk: false,
+    nearbyDoor: null,
+    playerPos: { x: 0, z: 10 },
+    playerYaw: Math.PI,
+    inputVec: { x: 0, z: 0 },
+    keys: {},
+    battle: null
+  };
+
+  // =========================================================================
+  // 3. SINTETIZADOR WEB AUDIO CON RITMOS BOLIVIANOS-URBANOS (100% ORIGINAL)
+  // =========================================================================
+  class CambaBeatAudio {
+    constructor() {
+      this.ctx = null;
+      this.stepTimer = null;
+      this.step = 0;
+    }
+    init() {
+      if (!this.ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) this.ctx = new AC();
+      }
+      if (this.ctx && this.ctx.state === 'suspended') {
+        this.ctx.resume().catch(() => {});
+      }
+    }
+    playTone(freq, dur, type, vol, slideTo) {
+      if (!state.soundOn || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = type || 'triangle';
+      osc.frequency.setValueAtTime(freq, now);
+      if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + dur);
+      gain.gain.setValueAtTime(vol || 0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + dur + 0.02);
+    }
+    playNoise(dur, vol) {
+      if (!state.soundOn || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const bufferSize = Math.floor(this.ctx.sampleRate * dur);
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 2100;
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(vol || 0.055, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+      noise.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
+      noise.start(now);
+    }
+    sfxHit(quality) {
+      if (quality === 'PERFECT') this.playTone(740, 0.11, 'sine', 0.14, 1110);
+      else if (quality === 'GREAT') this.playTone(554, 0.09, 'triangle', 0.12, 740);
+      else this.playTone(170, 0.14, 'sawtooth', 0.08, 95);
+    }
+    sfxOverdrive() {
+      this.playTone(392, 0.22, 'triangle', 0.14, 784);
+      setTimeout(() => this.playTone(587, 0.25, 'sine', 0.14, 1174), 85);
+    }
+    sfxLevelUp() {
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+        setTimeout(() => this.playTone(f, 0.18, 'triangle', 0.14), i * 85);
+      });
+    }
+    startBeat(stage) {
+      this.stopBeat();
+      this.init();
+      this.step = 0;
+      const effBpm = state.manualBpm || stage.bpm;
+      const sixteenthMs = (60000 / effBpm) / 4;
+      // Escala pentatónica alegre andino-oriental (fusión taquirari / caporal / urbano)
+      const scale = [1, 1.122, 1.26, 1.498, 1.682, 2.0];
+      this.stepTimer = setInterval(() => {
+        if (!state.soundOn || !this.ctx || state.mode !== 'battle') return;
+        const s = this.step % 16;
+        // Bombo camba / caporal sincopado
+        const isKick = (stage.rhythmKind === 'caporal')
+          ? (s === 0 || s === 3 || s === 6 || s === 8 || s === 11 || s === 14)
+          : (s === 0 || s === 6 || s === 8 || s === 14);
+        if (isKick) {
+          this.playTone(142, 0.14, 'sine', 0.22, 46);
+        }
+        // Caja / palmas alegres
+        if (s === 4 || s === 12) {
+          this.playNoise(0.10, 0.09);
+          this.playTone(250, 0.07, 'triangle', 0.08, 130);
+        }
+        // Chajchas / shaker rítmico
+        if (s % 2 === 1) {
+          this.playNoise(0.032, 0.042);
+        }
+        // Bajo melódico
+        if (s === 0 || s === 4 || s === 8 || s === 10 || s === 12) {
+          const mult = scale[(s + stage.id) % scale.length];
+          this.playTone(stage.chordRoot * mult, 0.16, 'triangle', 0.09);
+        }
+        // Arpegio tipo charango / marimba tropical
+        if (s === 2 || s === 5 || s === 7 || s === 11 || s === 14) {
+          const mult = scale[(s * 2 + stage.id) % scale.length];
+          this.playTone(stage.chordRoot * 4 * mult, 0.09, 'sine', 0.055);
+        }
+        this.step++;
+      }, sixteenthMs);
+    }
+    stopBeat() {
+      if (this.stepTimer) {
+        clearInterval(this.stepTimer);
+        this.stepTimer = null;
+      }
+      this.stopCustomTrack();
+    }
+    setCustomTrack(srcUrl, label, fallbackUrl) {
+      this.stopCustomTrack();
+      this.customSrc = srcUrl || '';
+      this.customFallbackSrc = fallbackUrl || '';
+      this.customLabel = label || '';
+      if (this.customSrc) {
+        if (!this.trackEl) {
+          this.trackEl = new Audio();
+          this.trackEl.loop = true;
+          this.trackEl.volume = 0.85;
+        }
+        this.trackEl.src = this.customSrc;
+        this.trackEl.load();
+      }
+    }
+    playTurnTrack(stage, restartFromZero) {
+      if (!state.soundOn) return;
+      if (this.customSrc && this.trackEl) {
+        // Detener synth para que la pista de Drive/MP3 suene limpia
+        if (this.stepTimer) { clearInterval(this.stepTimer); this.stepTimer = null; }
+        if (restartFromZero) {
+          try { this.trackEl.currentTime = 0; } catch (e) {}
+        }
+        const p = this.trackEl.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {
+            if (this.customFallbackSrc && this.trackEl.src !== this.customFallbackSrc) {
+              this.trackEl.src = this.customFallbackSrc;
+              this.trackEl.play().catch(() => {
+                if (stage) this.startBeat(stage);
+              });
+            } else if (stage) {
+              this.startBeat(stage);
+            }
+          });
+        }
+      } else if (stage) {
+        this.startBeat(stage);
+      }
+    }
+    stopCustomTrack() {
+      if (this.trackEl) {
+        try { this.trackEl.pause(); } catch (e) {}
+      }
+    }
+  }
+  const audio = new CambaBeatAudio();
+
+  function parseDriveAudioUrl(raw) {
+    const str = (raw || '').trim();
+    if (!str) return null;
+    // Extraer ID de enlaces típicos de Google Drive
+    let id = null;
+    const m1 = str.match(/\/file\/d\/([a-zA-Z0-9_-]{15,})/);
+    const m2 = str.match(/[?&]id=([a-zA-Z0-9_-]{15,})/);
+    const m3 = /^[a-zA-Z0-9_-]{20,}$/.test(str) ? [str, str] : null;
+    if (m1) id = m1[1];
+    else if (m2) id = m2[1];
+    else if (m3) id = m3[1];
+    if (id) {
+      return {
+        primary: 'https://docs.google.com/uc?export=open&id=' + id,
+        fallback: 'https://drive.google.com/uc?export=download&id=' + id,
+        label: 'Google Drive (' + id.slice(0, 8) + '...)'
+      };
+    }
+    if (/^https?:\/\//i.test(str)) {
+      return { primary: str, fallback: '', label: 'Pista URL externa' };
+    }
+    return null;
+  }
+
+  // =========================================================================
+  // 4. THREE.JS ENGINE (60 FPS MÓVIL — PIXELRATIO 1, SIN SHADOWMAP PESADO)
+  // =========================================================================
+  const container = document.getElementById('webgl-container');
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(1);
+  renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.shadowMap.enabled = false;
+  container.appendChild(renderer.domElement);
+
+  let isSoftwareGl = false;
+  try {
+    const gl = renderer.getContext();
+    const dbg = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    if (dbg) {
+      const rend = String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) || '');
+      isSoftwareGl = /swiftshader|llvmpipe|software/i.test(rend);
+    }
+  } catch (e) {}
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x2c1f3a);
+  scene.fog = new THREE.Fog(0x2c1f3a, 38, 102);
+
+  const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 180);
+
+  // Iluminación cálida de atardecer cruceño + luz de retrato de pasarela
+  const hemiLight = new THREE.HemisphereLight(0xffe7c7, 0x2b2340, 0.98);
+  scene.add(hemiLight);
+  const sunLight = new THREE.DirectionalLight(0xffdfb8, 1.02);
+  sunLight.position.set(16, 26, 18);
+  scene.add(sunLight);
+  const fillLight = new THREE.DirectionalLight(0xf9a8d4, 0.42);
+  fillLight.position.set(-14, 12, -16);
+  scene.add(fillLight);
+
+  let activeWorldGroup = null;
+  let mapRefs = null;
+  let battleRefs = null;
+
+  function disposeObject3D(obj) {
+    if (!obj) return;
+    obj.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => { if (m.map) m.map.dispose(); m.dispose(); });
+        } else {
+          if (child.material.map) child.material.map.dispose();
+          child.material.dispose();
+        }
+      }
+    });
+  }
+
+  function clearWorld() {
+    if (activeWorldGroup) {
+      scene.remove(activeWorldGroup);
+      disposeObject3D(activeWorldGroup);
+      activeWorldGroup = null;
+    }
+    mapRefs = null;
+    battleRefs = null;
+  }
+
+  // =========================================================================
+  // 5. TEXTURAS PROCEDURALES: CIELO CRUCEÑO, PIEDRA, ROSTRO EDITORIAL & SEDA
+  // =========================================================================
+  const texCache = {};
+
+  function getCambaSunsetSkyTexture() {
+    if (texCache.sky) return texCache.sky;
+    const c = document.createElement('canvas');
+    c.width = 1024; c.height = 512;
+    const ctx = c.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, 512);
+    g.addColorStop(0.00, '#161b3c');
+    g.addColorStop(0.28, '#3b2454');
+    g.addColorStop(0.46, '#9c3d5e');
+    g.addColorStop(0.55, '#e8825a');
+    g.addColorStop(0.61, '#fcd38d');
+    g.addColorStop(0.68, '#4a3248');
+    g.addColorStop(1.00, '#1a1524');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 1024, 512);
+
+    // Sol tropical de Santa Cruz
+    const sunG = ctx.createRadialGradient(512, 286, 12, 512, 286, 170);
+    sunG.addColorStop(0, 'rgba(255, 250, 224, 0.95)');
+    sunG.addColorStop(0.30, 'rgba(253, 198, 120, 0.55)');
+    sunG.addColorStop(1, 'rgba(232, 110, 96, 0)');
+    ctx.fillStyle = sunG;
+    ctx.fillRect(320, 110, 384, 340);
+
+    // Nubes suaves tropicales
+    for (let i = 0; i < 28; i++) {
+      const cx = (i * 149) % 1024;
+      const cy = 170 + (i * 31) % 95;
+      const rx = 55 + (i % 4) * 26;
+      ctx.fillStyle = (i % 2 === 0) ? 'rgba(255, 206, 166, 0.28)' : 'rgba(220, 146, 180, 0.22)';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, rx, 14 + (i % 3) * 4, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    texCache.sky = new THREE.CanvasTexture(c);
+    return texCache.sky;
+  }
+
+  function getPlazaTravertineTexture() {
+    if (texCache.plaza) return texCache.plaza;
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#47413c';
+    ctx.fillRect(0, 0, 512, 512);
+    for (let y = 0; y < 512; y += 32) {
+      for (let x = 0; x < 512; x += 32) {
+        ctx.fillStyle = ((x / 32 + y / 32) % 2 === 0) ? 'rgba(255,244,225,0.08)' : 'rgba(20,16,14,0.10)';
+        ctx.fillRect(x + 1, y + 1, 30, 30);
+      }
+    }
+    // Medallón cruceño verde-blanco-verde + borde dorado
+    ctx.strokeStyle = 'rgba(16, 185, 129, 0.58)'; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.arc(256, 256, 224, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)'; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(256, 256, 212, 0, Math.PI * 2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(250, 204, 21, 0.55)'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(256, 256, 142, 0, Math.PI * 2); ctx.stroke();
+    texCache.plaza = new THREE.CanvasTexture(c);
+    return texCache.plaza;
+  }
+
+  function getFlagTexture(kind) {
+    const key = 'flag_' + kind;
+    if (texCache[key]) return texCache[key];
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 160;
+    const ctx = c.getContext('2d');
+    const stripes = kind === 'bolivia' ? ['#D52B1E', '#F9E300', '#007934'] : ['#007934', '#FFFFFF', '#007934'];
+    stripes.forEach((col, i) => {
+      ctx.fillStyle = col;
+      ctx.fillRect(0, i * (160 / 3), 256, 160 / 3 + 1);
+    });
+    texCache[key] = new THREE.CanvasTexture(c);
+    return texCache[key];
+  }
+
+  function getEditorialFaceTexture(skinHex, irisCss, lipCss) {
+    const key = `face_${skinHex}_${irisCss}_${lipCss}`;
+    if (texCache[key]) return texCache[key];
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const ctx = c.getContext('2d');
+    const skinCss = '#' + Number(skinHex).toString(16).padStart(6, '0');
+    ctx.fillStyle = skinCss;
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Contorno suave editorial
+    const shade = ctx.createRadialGradient(256, 232, 36, 256, 256, 240);
+    shade.addColorStop(0, 'rgba(255,248,242,0.20)');
+    shade.addColorStop(0.55, 'rgba(255,255,255,0)');
+    shade.addColorStop(1, 'rgba(82,36,24,0.24)');
+    ctx.fillStyle = shade;
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Rubor cálido en pómulos
+    [-1, 1].forEach((side) => {
+      const bx = 256 + side * 66;
+      const bg = ctx.createRadialGradient(bx, 286, 4, bx, 286, 40);
+      bg.addColorStop(0, 'rgba(236, 102, 130, 0.30)');
+      bg.addColorStop(1, 'rgba(236, 102, 130, 0)');
+      ctx.fillStyle = bg;
+      ctx.beginPath(); ctx.ellipse(bx, 286, 40, 24, 0, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // Ojos almendrados realistas con iris luminoso y delineado felino
+    [-1, 1].forEach((side) => {
+      const ex = 256 + side * 46;
+      const ey = 244;
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(ex - 22 * side, ey + 2);
+      ctx.quadraticCurveTo(ex, ey - 14, ex + 22 * side, ey - 1);
+      ctx.quadraticCurveTo(ex, ey + 11, ex - 22 * side, ey + 2);
+      ctx.closePath();
+      ctx.fillStyle = '#fcfdff';
+      ctx.fill();
+      ctx.clip();
+
+      const ig = ctx.createRadialGradient(ex, ey + 2, 2, ex, ey, 11.5);
+      ig.addColorStop(0, '#090d16');
+      ig.addColorStop(0.38, irisCss);
+      ig.addColorStop(0.85, '#1e1b2e');
+      ig.addColorStop(1, '#090d16');
+      ctx.fillStyle = ig;
+      ctx.beginPath(); ctx.arc(ex, ey, 11.5, 0, Math.PI * 2); ctx.fill();
+
+      ctx.fillStyle = '#05070c';
+      ctx.beginPath(); ctx.arc(ex, ey, 4.8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(ex - 3.5, ey - 3.5, 2.5, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(ex + 3.5, ey + 2.5, 1.3, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+
+      // Delineado felino editorial
+      ctx.strokeStyle = '#110c0e';
+      ctx.lineWidth = 3.6;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(ex - 21 * side, ey + 1);
+      ctx.quadraticCurveTo(ex, ey - 14.5, ex + 26 * side, ey - 5);
+      ctx.stroke();
+
+      // Cejas arqueadas naturales
+      ctx.strokeStyle = '#281710';
+      ctx.lineWidth = 4.2;
+      ctx.beginPath();
+      ctx.moveTo(ex - 22 * side, ey - 22);
+      ctx.quadraticCurveTo(ex + 4 * side, ey - 32, ex + 24 * side, ey - 21);
+      ctx.stroke();
+    });
+
+    // Puente nasal sutil
+    ctx.fillStyle = 'rgba(255,248,240,0.22)';
+    ctx.fillRect(253, 248, 6, 36);
+
+    // Labios gloss esculpidos con arco de Cupido
+    ctx.fillStyle = lipCss;
+    ctx.beginPath();
+    ctx.moveTo(230, 324);
+    ctx.quadraticCurveTo(245, 313, 256, 319);
+    ctx.quadraticCurveTo(267, 313, 282, 324);
+    ctx.quadraticCurveTo(256, 342, 230, 324);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.48)';
+    ctx.beginPath(); ctx.ellipse(256, 331, 12, 2.8, 0, 0, Math.PI * 2); ctx.fill();
+
+    texCache[key] = new THREE.CanvasTexture(c);
+    return texCache[key];
+  }
+
+  function getCoutureFabricTexture(primaryHex, secondaryHex, accentHex) {
+    const key = `fab_${primaryHex}_${secondaryHex}_${accentHex}`;
+    if (texCache[key]) return texCache[key];
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    const ctx = c.getContext('2d');
+    const toHex = (n) => '#' + Number(n).toString(16).padStart(6, '0');
+    const g = ctx.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0.0, toHex(primaryHex));
+    g.addColorStop(0.68, toHex(primaryHex));
+    g.addColorStop(0.92, toHex(secondaryHex));
+    g.addColorStop(1.0, toHex(accentHex));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 256, 256);
+
+    // Destellos de micro-pedrería de alta costura
+    for (let i = 0; i < 95; i++) {
+      const sx = (i * 53 + (i % 7) * 19) % 248 + 4;
+      const sy = (i * 89 + (i % 5) * 23) % 248 + 4;
+      ctx.fillStyle = i % 3 === 0 ? 'rgba(255,255,255,0.65)' : 'rgba(254,240,138,0.45)';
+      ctx.beginPath(); ctx.arc(sx, sy, i % 4 === 0 ? 2.1 : 1.2, 0, Math.PI * 2); ctx.fill();
+    }
+    texCache[key] = new THREE.CanvasTexture(c);
+    return texCache[key];
+  }
+
+  function getBuildingFacadeTexture(baseCss, winCss) {
+    const key = `bldg_${baseCss}_${winCss}`;
+    if (texCache[key]) return texCache[key];
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = baseCss;
+    ctx.fillRect(0, 0, 128, 256);
+    for (let y = 12; y < 244; y += 16) {
+      for (let x = 10; x < 118; x += 16) {
+        ctx.fillStyle = ((x + y) % 32 === 0) ? 'rgba(15,23,42,0.72)' : winCss;
+        ctx.fillRect(x, y, 9, 9);
+      }
+    }
+    texCache[key] = new THREE.CanvasTexture(c);
+    return texCache[key];
+  }
+
+  // =========================================================================
+  // 6. ESCULTOR DE MODELOS FEMENINAS REALISTAS DE ALTA MODA (LATHE + COUTURE)
+  // =========================================================================
+  function createPleatedSkirtGeometry(pts, radialSegs, pleats, depth, zScale) {
+    const geo = new THREE.LatheGeometry(pts, radialSegs);
+    const pos = geo.attributes.position;
+    let minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      const y = pos.getY(i);
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    const span = Math.max(0.001, maxY - minY);
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const tDown = (maxY - y) / span;
+      const ang = Math.atan2(z, x);
+      const wave = 1 + Math.sin(ang * pleats) * depth * tDown * tDown;
+      pos.setXYZ(i, x * wave, y, z * wave * zScale);
+    }
+    geo.computeVertexNormals();
+    return geo;
+  }
+
+  function createCoutureFemaleModel(spec, showAura) {
+    const root = new THREE.Group();
+    const skinMat = new THREE.MeshPhongMaterial({ color: spec.skin, shininess: 24, specular: 0x3a241b });
+    const faceMat = new THREE.MeshPhongMaterial({
+      map: getEditorialFaceTexture(spec.skin, spec.iris, spec.lip),
+      shininess: 28, specular: 0x38241d
+    });
+    const fabricMat = new THREE.MeshPhongMaterial({
+      map: getCoutureFabricTexture(spec.primary, spec.secondary, spec.accent),
+      shininess: 68, specular: 0xffe8c2, side: THREE.DoubleSide
+    });
+    const secondaryMat = new THREE.MeshPhongMaterial({
+      color: spec.secondary, shininess: 85, specular: 0xffffff, side: THREE.DoubleSide
+    });
+    const tulleMat = new THREE.MeshPhongMaterial({
+      color: spec.tulle, transparent: true, opacity: 0.42,
+      shininess: 90, specular: 0xffffff, side: THREE.DoubleSide, depthWrite: false
+    });
+    const hairMat = new THREE.MeshPhongMaterial({
+      color: spec.hair, shininess: 72, specular: 0x6b5344, side: THREE.DoubleSide
+    });
+    const goldMat = new THREE.MeshPhongMaterial({ color: 0xfacc15, shininess: 120, specular: 0xffffff });
+    const crystalMat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: spec.accent, emissiveIntensity: 0.28, shininess: 130 });
+    const heelMat = new THREE.MeshPhongMaterial({ color: spec.primary, shininess: 95, specular: 0xffffff });
+
+    // Sombra suave de contacto (0 costo de shadowMap)
+    const shadow = new THREE.Mesh(
+      new THREE.CircleGeometry(0.56, 20),
+      new THREE.MeshBasicMaterial({ color: 0x05060b, transparent: true, opacity: 0.38 })
+    );
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.02;
+    root.add(shadow);
+
+    const rig = new THREE.Group();
+    root.add(rig);
+
+    // Escala proporcionada (altura total ~2.05m en escena para lucir esbelta y elegante)
+    const HIP_Y = 0.96;
+
+    // 1. TORSO ANATÓMICO FEMENINO CONTINUO (LatheGeometry reloj de arena)
+    const torso = new THREE.Group();
+    torso.position.y = HIP_Y;
+    rig.add(torso);
+
+    const torsoPts = [
+      new THREE.Vector2(0.001, -0.06),
+      new THREE.Vector2(0.142, 0.00),
+      new THREE.Vector2(0.174, 0.10), // Cadera estilizada
+      new THREE.Vector2(0.132, 0.25),
+      new THREE.Vector2(0.102, 0.40), // Cintura fina
+      new THREE.Vector2(0.134, 0.56),
+      new THREE.Vector2(0.156, 0.70), // Pecho / escote
+      new THREE.Vector2(0.148, 0.80), // Hombros femeninos
+      new THREE.Vector2(0.095, 0.88),
+      new THREE.Vector2(0.048, 0.93)
+    ];
+    const torsoGeo = new THREE.LatheGeometry(torsoPts, 28);
+    const tp = torsoGeo.attributes.position;
+    for (let i = 0; i < tp.count; i++) {
+      const x = tp.getX(i), y = tp.getY(i);
+      let z = tp.getZ(i) * 0.72;
+      if (z > 0 && y > 0.52 && y < 0.80) {
+        const dy = (y - 0.67) / 0.10;
+        const dxL = (x - 0.052) / 0.065;
+        const dxR = (x + 0.052) / 0.065;
+        z += (Math.exp(-(dy * dy + dxL * dxL)) + Math.exp(-(dy * dy + dxR * dxR))) * 0.052;
+      }
+      tp.setXYZ(i, x, y, z);
+    }
+    torsoGeo.computeVertexNormals();
+    torso.add(new THREE.Mesh(torsoGeo, fabricMat));
+
+    // Cinturón joya dorado en la cintura
+    const belt = new THREE.Mesh(new THREE.TorusGeometry(0.108, 0.011, 8, 28), goldMat);
+    belt.rotation.x = Math.PI / 2;
+    belt.scale.set(1.03, 0.74, 1.0);
+    belt.position.y = 0.40;
+    torso.add(belt);
+
+    // Collar joya en el cuello
+    const choker = new THREE.Mesh(new THREE.TorusGeometry(0.054, 0.008, 8, 24), goldMat);
+    choker.rotation.x = Math.PI / 2;
+    choker.position.y = 0.93;
+    const pendant = new THREE.Mesh(new THREE.OctahedronGeometry(0.022, 0), crystalMat);
+    pendant.position.set(0, 0.87, 0.095);
+    torso.add(choker, pendant);
+
+    // Siluetas de Alta Costura diferenciadas por modelo (con grupo de falda para física de giro)
+    const skirtGrp = new THREE.Group();
+    torso.add(skirtGrp);
+    if (spec.silhouette === 'mermaid') {
+      const skirtPts = [
+        new THREE.Vector2(0.112, 0.39),
+        new THREE.Vector2(0.195, 0.10),
+        new THREE.Vector2(0.205, -0.14),
+        new THREE.Vector2(0.215, -0.40),
+        new THREE.Vector2(0.285, -0.72),
+        new THREE.Vector2(0.360, -0.88)
+      ];
+      skirtGrp.add(new THREE.Mesh(createPleatedSkirtGeometry(skirtPts, 32, 14, 0.06, 0.84), fabricMat));
+      const veilPts = [
+        new THREE.Vector2(0.118, 0.38),
+        new THREE.Vector2(0.220, 0.08),
+        new THREE.Vector2(0.295, -0.32),
+        new THREE.Vector2(0.400, -0.88)
+      ];
+      skirtGrp.add(new THREE.Mesh(createPleatedSkirtGeometry(veilPts, 32, 18, 0.08, 0.86), tulleMat));
+    } else if (spec.silhouette === 'aline') {
+      const aPts = [
+        new THREE.Vector2(0.108, 0.39),
+        new THREE.Vector2(0.200, 0.10),
+        new THREE.Vector2(0.285, -0.22),
+        new THREE.Vector2(0.365, -0.64),
+        new THREE.Vector2(0.415, -0.84)
+      ];
+      skirtGrp.add(new THREE.Mesh(createPleatedSkirtGeometry(aPts, 32, 16, 0.07, 0.84), fabricMat));
+      const overPts = [
+        new THREE.Vector2(0.114, 0.39),
+        new THREE.Vector2(0.225, 0.08),
+        new THREE.Vector2(0.345, -0.34),
+        new THREE.Vector2(0.455, -0.86)
+      ];
+      skirtGrp.add(new THREE.Mesh(createPleatedSkirtGeometry(overPts, 32, 20, 0.09, 0.86), tulleMat));
+    } else if (spec.silhouette === 'peplum') {
+      const pepPts = [
+        new THREE.Vector2(0.108, 0.40),
+        new THREE.Vector2(0.210, 0.22),
+        new THREE.Vector2(0.265, 0.02)
+      ];
+      skirtGrp.add(new THREE.Mesh(createPleatedSkirtGeometry(pepPts, 28, 16, 0.08, 0.80), tulleMat));
+      const colPts = [
+        new THREE.Vector2(0.165, 0.12),
+        new THREE.Vector2(0.175, -0.18),
+        new THREE.Vector2(0.195, -0.68)
+      ];
+      skirtGrp.add(new THREE.Mesh(createPleatedSkirtGeometry(colPts, 28, 12, 0.04, 0.78), fabricMat));
+    } else {
+      // Palazzo couture de pasarela (solapas estructuradas en el torso)
+      [-1, 1].forEach((s) => {
+        const lapel = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.30, 0.022), secondaryMat);
+        lapel.position.set(s * 0.068, 0.66, 0.115);
+        lapel.rotation.z = s * -0.25;
+        torso.add(lapel);
+      });
+    }
+
+    // 2. CUELLO Y CABEZA ESCULPIDA EDITORIAL
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.052, 0.16, 16), skinMat);
+    neck.position.y = 0.99;
+    torso.add(neck);
+
+    const headGroup = new THREE.Group();
+    headGroup.position.y = 1.18;
+    torso.add(headGroup);
+
+    const headGeo = new THREE.SphereGeometry(0.155, 28, 24);
+    headGeo.scale(0.84, 1.12, 0.92);
+    const headMesh = new THREE.Mesh(headGeo, faceMat);
+    headMesh.rotation.y = -Math.PI / 2; // Alinear rostro (u=0.5) hacia +Z
+    headGroup.add(headMesh);
+
+    // Nariz fina y aretes colgantes
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.012, 0.036, 8), skinMat);
+    nose.rotation.x = Math.PI / 2.2;
+    nose.position.set(0, -0.012, 0.144);
+    headGroup.add(nose);
+
+    [-1, 1].forEach((side) => {
+      const earring = new THREE.Mesh(new THREE.OctahedronGeometry(0.015, 0), crystalMat);
+      earring.scale.set(0.65, 1.6, 0.65);
+      earring.position.set(side * 0.132, -0.045, 0.0);
+      headGroup.add(earring);
+    });
+
+    // Cabello femenino de alta peluquería (inclinado atrás para despejar ojos y cejas editoriales)
+    const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.166, 22, 18, 0, Math.PI * 2, 0, Math.PI * 0.48), hairMat);
+    hairCap.scale.set(0.89, 1.08, 0.96);
+    hairCap.position.set(0, 0.028, -0.024);
+    hairCap.rotation.x = -0.44;
+    headGroup.add(hairCap);
+
+    if (spec.hairStyle === 'ponytail') {
+      const band = new THREE.Mesh(new THREE.TorusGeometry(0.048, 0.011, 8, 18), goldMat);
+      band.position.set(0, 0.14, -0.12); band.rotation.x = Math.PI / 2;
+      const tail = new THREE.Mesh(new THREE.ConeGeometry(0.105, 0.56, 16), hairMat);
+      tail.position.set(0, -0.12, -0.17); tail.rotation.x = 0.25;
+      headGroup.add(band, tail);
+    } else if (spec.hairStyle === 'chignon') {
+      const bun = new THREE.Mesh(new THREE.SphereGeometry(0.088, 16, 16), hairMat);
+      bun.position.set(0, 0.21, -0.04);
+      headGroup.add(bun);
+    } else {
+      // Melena larga ondulada Hollywood
+      const veilGeo = new THREE.CylinderGeometry(0.148, 0.205, 0.56, 20, 1, true, Math.PI * 0.35, Math.PI * 1.3);
+      const veil = new THREE.Mesh(veilGeo, hairMat);
+      veil.position.set(0, -0.22, -0.04);
+      headGroup.add(veil);
+      [-1, 1].forEach((s) => {
+        const lock = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.018, 0.34, 10), hairMat);
+        lock.position.set(s * 0.125, -0.12, 0.045);
+        lock.rotation.z = s * 0.12;
+        headGroup.add(lock);
+      });
+    }
+
+    // Tocados / Tiara de Alta Moda (con variante flor de tajibo para Santa Cruz)
+    if (spec.crown === 'tajibo_tiara') {
+      const arc = new THREE.Mesh(new THREE.TorusGeometry(0.125, 0.008, 8, 24, Math.PI), goldMat);
+      arc.position.set(0, 0.145, 0.02);
+      const flowerMat = new THREE.MeshBasicMaterial({ color: 0xf472b6 });
+      for (let f = -1; f <= 1; f++) {
+        const fl = new THREE.Mesh(new THREE.DodecahedronGeometry(0.026, 0), flowerMat);
+        fl.position.set(f * 0.05, 0.21 - Math.abs(f) * 0.02, 0.085);
+        headGroup.add(fl);
+      }
+      headGroup.add(arc);
+    } else if (spec.crown === 'imperial' || spec.crown === 'halo') {
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.008, 8, 28), goldMat);
+      halo.position.set(0, 0.16, -0.02);
+      headGroup.add(halo);
+      for (let r = -2; r <= 2; r++) {
+        const ray = new THREE.Mesh(new THREE.ConeGeometry(0.014, 0.09, 5), goldMat);
+        const a = r * 0.35;
+        ray.position.set(Math.sin(a) * 0.18, 0.18 + Math.cos(a) * 0.08, -0.01);
+        ray.rotation.z = -a;
+        headGroup.add(ray);
+      }
+    } else {
+      const tiara = new THREE.Mesh(new THREE.TorusGeometry(0.122, 0.008, 8, 24, Math.PI), goldMat);
+      tiara.position.set(0, 0.145, 0.025);
+      const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.024, 0), crystalMat);
+      gem.position.set(0, 0.215, 0.085);
+      headGroup.add(tiara, gem);
+    }
+
+    // 3. BRAZOS ESTILIZADOS (Hombro + Codo + Mano delicada)
+    function makeArm(side) {
+      const shoulder = new THREE.Group();
+      shoulder.position.set(side * 0.175, 0.78, 0);
+      torso.add(shoulder);
+      const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.036, 0.030, 0.32, 12), skinMat);
+      upper.position.y = -0.16;
+      shoulder.add(upper);
+      const elbow = new THREE.Group();
+      elbow.position.y = -0.32;
+      shoulder.add(elbow);
+      const fore = new THREE.Mesh(new THREE.CylinderGeometry(0.029, 0.022, 0.30, 12), spec.silhouette === 'palazzo' ? fabricMat : skinMat);
+      fore.position.y = -0.15;
+      elbow.add(fore);
+      const bracelet = new THREE.Mesh(new THREE.TorusGeometry(0.026, 0.006, 6, 16), goldMat);
+      bracelet.rotation.x = Math.PI / 2;
+      bracelet.position.y = -0.27;
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.024, 10, 10), skinMat);
+      hand.scale.set(0.75, 1.35, 0.45);
+      hand.position.y = -0.32;
+      elbow.add(bracelet, hand);
+      return { shoulder, elbow };
+    }
+    const armL = makeArm(-1);
+    const armR = makeArm(1);
+
+    // 4. PIERNAS ESBELTAS DE PASARELA + TACONES FINOS
+    function makeLeg(side) {
+      const hip = new THREE.Group();
+      hip.position.set(side * 0.082, HIP_Y, 0);
+      rig.add(hip);
+      const legMat = spec.silhouette === 'palazzo' ? fabricMat : skinMat;
+      const thigh = new THREE.Mesh(new THREE.CylinderGeometry(0.064, 0.048, 0.48, 14), legMat);
+      thigh.position.y = -0.24;
+      hip.add(thigh);
+      const knee = new THREE.Group();
+      knee.position.y = -0.48;
+      hip.add(knee);
+      const shin = new THREE.Mesh(new THREE.CylinderGeometry(spec.silhouette === 'palazzo' ? 0.068 : 0.044, spec.silhouette === 'palazzo' ? 0.092 : 0.028, 0.44, 14), legMat);
+      shin.position.y = -0.22;
+      knee.add(shin);
+      // Tacón fino de alta costura
+      const vamp = new THREE.Mesh(new THREE.SphereGeometry(0.044, 12, 10), heelMat);
+      vamp.scale.set(0.82, 0.58, 1.75);
+      vamp.position.set(0, -0.44, 0.04);
+      const stiletto = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.006, 0.09, 8), goldMat);
+      stiletto.position.set(0, -0.43, -0.032);
+      knee.add(vamp, stiletto);
+      return { hip, knee };
+    }
+    const legL = makeLeg(-1);
+    const legR = makeLeg(1);
+
+    // Aro de pasarela bajo los pies
+    const aura = new THREE.Mesh(
+      new THREE.RingGeometry(0.50, 0.62, 28),
+      new THREE.MeshBasicMaterial({ color: spec.accent, side: THREE.DoubleSide, transparent: true, opacity: showAura ? 0.72 : 0 })
+    );
+    aura.rotation.x = -Math.PI / 2;
+    aura.position.y = 0.03;
+    root.add(aura);
+
+    return { root, rig, torso, skirtGrp, headGroup, armL, armR, legL, legR, aura, moveTimer: 0, moveType: 0 };
+  }
+
+  function animateCatwalkWalk(d, t, speed) {
+    const s = Math.min(speed, 1);
+    d.rig.position.y = Math.abs(Math.sin(t * 9.5)) * 0.05 * s;
+    d.torso.rotation.y = Math.sin(t * 9.5) * 0.16 * s;
+    d.torso.rotation.z = Math.cos(t * 9.5) * 0.06 * s;
+    d.armL.shoulder.rotation.x = Math.sin(t * 9.5) * 0.52 * s;
+    d.armR.shoulder.rotation.x = -Math.sin(t * 9.5) * 0.52 * s;
+    d.armL.shoulder.rotation.z = 0.16;
+    d.armR.shoulder.rotation.z = -0.16;
+    d.armL.elbow.rotation.x = -0.28 * s;
+    d.armR.elbow.rotation.x = -0.28 * s;
+    d.legL.hip.rotation.x = -Math.sin(t * 9.5) * 0.62 * s;
+    d.legR.hip.rotation.x = Math.sin(t * 9.5) * 0.62 * s;
+    d.legL.knee.rotation.x = Math.max(0, Math.sin(t * 9.5)) * 0.52 * s;
+    d.legR.knee.rotation.x = Math.max(0, -Math.sin(t * 9.5)) * 0.52 * s;
+    d.headGroup.rotation.y = Math.sin(t * 2.2) * 0.10;
+  }
+
+  function lerpV(cur, tgt, alpha) {
+    return cur + (tgt - cur) * alpha;
+  }
+
+  function applySmoothPose(d, pose, blend) {
+    const a = blend || 0.22;
+    d.rig.position.x = lerpV(d.rig.position.x, pose.rx || 0, a);
+    d.rig.position.y = lerpV(d.rig.position.y, pose.ry || 0, a);
+    d.rig.position.z = lerpV(d.rig.position.z, pose.rz || 0, a);
+    if (pose.spinSpeed) {
+      d.rig.rotation.y += pose.spinSpeed;
+    } else {
+      d.rig.rotation.y = lerpV(d.rig.rotation.y, pose.rotY || 0, a);
+    }
+    d.torso.rotation.x = lerpV(d.torso.rotation.x, pose.tx || 0, a);
+    d.torso.rotation.y = lerpV(d.torso.rotation.y, pose.ty || 0, a);
+    d.torso.rotation.z = lerpV(d.torso.rotation.z, pose.tz || 0, a);
+    d.headGroup.rotation.x = lerpV(d.headGroup.rotation.x, pose.hx || 0, a);
+    d.headGroup.rotation.y = lerpV(d.headGroup.rotation.y, pose.hy || 0, a);
+    d.headGroup.rotation.z = lerpV(d.headGroup.rotation.z, pose.hz || 0, a);
+
+    d.armL.shoulder.rotation.x = lerpV(d.armL.shoulder.rotation.x, pose.alx || 0, a);
+    d.armL.shoulder.rotation.z = lerpV(d.armL.shoulder.rotation.z, pose.alz || 0.18, a);
+    d.armL.elbow.rotation.x = lerpV(d.armL.elbow.rotation.x, pose.ael || -0.35, a);
+
+    d.armR.shoulder.rotation.x = lerpV(d.armR.shoulder.rotation.x, pose.arx || 0, a);
+    d.armR.shoulder.rotation.z = lerpV(d.armR.shoulder.rotation.z, pose.arz || -0.18, a);
+    d.armR.elbow.rotation.x = lerpV(d.armR.elbow.rotation.x, pose.aer || -0.35, a);
+
+    d.legL.hip.rotation.x = lerpV(d.legL.hip.rotation.x, pose.llx || 0, a);
+    d.legL.hip.rotation.z = lerpV(d.legL.hip.rotation.z, pose.llz || 0, a);
+    d.legL.knee.rotation.x = lerpV(d.legL.knee.rotation.x, pose.lkl || 0, a);
+
+    d.legR.hip.rotation.x = lerpV(d.legR.hip.rotation.x, pose.lrx || 0, a);
+    d.legR.hip.rotation.z = lerpV(d.legR.hip.rotation.z, pose.lrz || 0, a);
+    d.legR.knee.rotation.x = lerpV(d.legR.knee.rotation.x, pose.lkr || 0, a);
+
+    if (d.skirtGrp) {
+      const flare = 1 + (pose.spinSpeed ? Math.min(0.24, Math.abs(pose.spinSpeed) * 0.85) : 0) + Math.max(0, (pose.ry || 0) * 0.35);
+      d.skirtGrp.scale.x = lerpV(d.skirtGrp.scale.x, flare, 0.16);
+      d.skirtGrp.scale.z = lerpV(d.skirtGrp.scale.z, flare, 0.16);
+    }
+  }
+
+  function animateCoutureBattle(d, t, bpm, energy, isSpotlight) {
+    const beat = t * (bpm / 60) * Math.PI;
+    const bounce = Math.abs(Math.sin(beat));
+    const groove = Math.sin(beat * 0.5);
+
+    // Pose elegante de espera en palco lateral mientras desfila la otra modelo
+    if (!isSpotlight) {
+      applySmoothPose(d, {
+        ry: Math.sin(t * 2.1) * 0.015,
+        ty: Math.sin(t * 1.1) * 0.08, tz: 0.06,
+        hx: Math.sin(beat) * 0.04, hy: Math.sin(t * 1.3) * 0.12,
+        alx: -0.22, alz: 0.36, ael: -0.98,
+        arx: -0.14, arz: -0.24, aer: -0.42,
+        llx: -0.08, llz: 0.04, lkl: 0.08,
+        lrx: 0.06, lrz: -0.04, lkr: 0.04
+      }, 0.14);
+      return;
+    }
+
+    // Coreografía escénica fluida de los 8 pasos Model Bolivia 2026
+    const stepAnim = d.activeStep || 'catwalk';
+    if (d.moveTimer > 0) {
+      d.moveTimer = Math.max(0, d.moveTimer - 0.016);
+      const phase = (d.moveDuration || 1.9) - d.moveTimer;
+      const w = phase * 5.2;
+
+      if (stepAnim === 'catwalk') {
+        // 1. PASARELA CATWALK: Desfile hacia adelante con cadera editorial + giro coqueto
+        const strut = Math.sin(w * 1.35);
+        const fwd = Math.sin(Math.min(Math.PI, phase * 1.75)) * 0.72;
+        applySmoothPose(d, {
+          rz: fwd, ry: Math.abs(strut) * 0.065,
+          rotY: Math.sin(w * 0.65) * 0.22,
+          ty: strut * 0.26, tz: Math.cos(w * 1.35) * 0.12,
+          hy: -strut * 0.16, hz: Math.cos(w * 1.35) * 0.06,
+          alx: strut * 0.55, alz: 0.28, ael: -0.42,
+          arx: -strut * 0.55, arz: -0.28, aer: -0.42,
+          llx: -strut * 0.72, llz: 0.09, lkl: Math.max(0, strut) * 0.62,
+          lrx: strut * 0.72, lrz: -0.09, lkr: Math.max(0, -strut) * 0.62
+        }, 0.22);
+      } else if (stepAnim === 'vogue') {
+        // 2. POSE VOGUE EDITORIAL: 3 poses de revista de alta moda en secuencia
+        const sub = Math.floor(phase * 1.65) % 3;
+        if (sub === 0) {
+          applySmoothPose(d, {
+            ry: 0.04, rz: 0.35, rotY: 0.34,
+            ty: -0.26, tz: 0.18, hy: -0.28, hz: -0.10,
+            alx: -1.65, alz: 0.42, ael: -1.35,
+            arx: -0.35, arz: -0.78, aer: -1.35,
+            llx: -0.24, llz: -0.16, lkl: 0.32,
+            lrx: 0.16, lrz: 0.12, lkr: 0.06
+          }, 0.18);
+        } else if (sub === 1) {
+          applySmoothPose(d, {
+            ry: 0.05, rz: 0.42, rotY: -0.38,
+            ty: 0.28, tz: -0.18, hy: 0.32, hz: 0.10,
+            alx: -0.32, alz: 0.80, ael: -1.38,
+            arx: -1.72, arz: -0.48, aer: -1.30,
+            llx: 0.18, llz: -0.12, lkl: 0.08,
+            lrx: -0.26, lrz: 0.16, lkr: 0.34
+          }, 0.18);
+        } else {
+          applySmoothPose(d, {
+            ry: 0.08, rz: 0.48, rotY: 0,
+            tx: -0.14, tz: 0.06, hx: -0.10,
+            alx: -2.15, alz: 0.62, ael: -0.95,
+            arx: -2.15, arz: -0.62, aer: -0.95,
+            llx: -0.18, llz: -0.14, lkl: 0.20,
+            lrx: 0.18, lrz: 0.14, lkr: 0.08
+          }, 0.18);
+        }
+      } else if (stepAnim === 'pirouette') {
+        // 3. PIRUETA 360° FOUETTÉ: Giro estilizado con pierna en passé y brazos corona
+        applySmoothPose(d, {
+          ry: 0.12 + bounce * 0.10, rz: 0.25, spinSpeed: 0.24,
+          tx: -0.05, hx: -0.06,
+          alx: -2.42, alz: 0.52, ael: -0.82,
+          arx: -2.42, arz: -0.52, aer: -0.82,
+          llx: -0.88, llz: -0.32, lkl: 1.25,
+          lrx: 0.04, lrz: 0, lkr: 0.04
+        }, 0.22);
+      } else if (stepAnim === 'taquirari') {
+        // 4. PASO TAQUIRARI CAMBA: Alegría cruceña con faldeo, hombros y cadencia tropical
+        const s = Math.sin(w * 1.6);
+        const hop = Math.abs(Math.sin(w * 1.6));
+        applySmoothPose(d, {
+          rx: Math.sin(w * 0.8) * 0.58, ry: 0.07 + hop * 0.15, rz: 0.22,
+          rotY: s * 0.36,
+          ty: s * 0.42, tz: -s * 0.18,
+          hy: -s * 0.18, hz: s * 0.12,
+          alx: -1.05 + s * 0.35, alz: 1.05 + s * 0.25, ael: -0.55,
+          arx: -1.05 - s * 0.35, arz: -1.05 + s * 0.25, aer: -0.55,
+          llx: s * 0.52, llz: -0.14, lkl: hop * 0.55,
+          lrx: -s * 0.52, lrz: 0.14, lkr: (1 - hop) * 0.55
+        }, 0.24);
+      } else if (stepAnim === 'caporal') {
+        // 5. SALTO CAPORAL 360°: Fuerza boliviana con rodillas altas, pecho altivo y giro aéreo
+        const stomp = Math.sin(w * 1.8);
+        const jump = Math.max(0, Math.sin(w * 1.8));
+        applySmoothPose(d, {
+          ry: 0.16 + jump * 0.32, rz: 0.20, spinSpeed: 0.15,
+          tx: -0.08, tz: stomp * 0.14,
+          alx: -2.35, alz: 0.72 + stomp * 0.22, ael: -0.45,
+          arx: -2.35, arz: -0.72 + stomp * 0.22, aer: -0.45,
+          llx: -0.82 * Math.max(0, stomp) + 0.25, llz: -0.18, lkl: Math.max(0, stomp) * 1.15,
+          lrx: -0.82 * Math.max(0, -stomp) + 0.25, lrz: 0.18, lkr: Math.max(0, -stomp) * 1.15
+        }, 0.24);
+      } else if (stepAnim === 'slide') {
+        // 6. SLIDE PASARELA VIP: Deslizamiento amplio lado a lado con olas de brazos
+        const glide = Math.sin(w * 0.9);
+        const wave = Math.cos(w * 1.8);
+        applySmoothPose(d, {
+          rx: glide * 1.05, ry: 0.04, rz: 0.30,
+          rotY: -glide * 0.35,
+          tz: -glide * 0.22, ty: glide * 0.28,
+          hy: glide * 0.22,
+          alx: -0.85 + wave * 0.35, alz: 1.25, ael: -0.32 + wave * 0.25,
+          arx: -0.85 - wave * 0.35, arz: -1.25, aer: -0.32 - wave * 0.25,
+          llx: Math.sin(w * 1.8) * 0.48, llz: -0.20, lkl: 0.26,
+          lrx: -Math.sin(w * 1.8) * 0.48, lrz: 0.20, lkr: 0.26
+        }, 0.20);
+      } else if (stepAnim === 'gala_bow') {
+        // 7. REVERENCIA GALA 24K: Reverencia real que se abre en saludo estrella al público
+        const openUp = phase > 0.75;
+        if (!openUp) {
+          applySmoothPose(d, {
+            ry: -0.05, rz: 0.45, rotY: 0,
+            tx: 0.34, hx: 0.18,
+            alx: -0.55, alz: 0.95, ael: -0.35,
+            arx: -0.55, arz: -0.95, aer: -0.35,
+            llx: -0.48, llz: -0.10, lkl: 0.65,
+            lrx: 0.38, lrz: 0.10, lkr: 0.35
+          }, 0.18);
+        } else {
+          applySmoothPose(d, {
+            ry: 0.10 + bounce * 0.06, rz: 0.52, rotY: Math.sin(w) * 0.24,
+            tx: -0.12, hx: -0.08,
+            alx: -2.05, alz: 1.25, ael: -0.20,
+            arx: -2.05, arz: -1.25, aer: -0.20,
+            llx: -0.14, llz: -0.10, lkl: 0.10,
+            lrx: 0.14, lrz: 0.10, lkr: 0.06
+          }, 0.18);
+        }
+      } else if (stepAnim === 'chovena') {
+        // 9. CHOVENA BRISA ORIENTAL: Vaivén chiquitano suave con cadera y brazos fluidos
+        const sw = Math.sin(w * 1.4);
+        applySmoothPose(d, {
+          rx: Math.sin(w * 0.7) * 0.72, ry: 0.05 + Math.abs(sw) * 0.08, rz: 0.28,
+          rotY: sw * 0.42, ty: sw * 0.38, tz: Math.cos(w * 1.4) * 0.14,
+          alx: -0.95 + sw * 0.38, alz: 1.15, ael: -0.45,
+          arx: -0.95 - sw * 0.38, arz: -1.15, aer: -0.45,
+          llx: sw * 0.48, llz: -0.10, lkl: Math.max(0, sw) * 0.45,
+          lrx: -sw * 0.48, lrz: 0.10, lkr: Math.max(0, -sw) * 0.45
+        }, 0.22);
+      } else if (stepAnim === 'tinku') {
+        // 10. ZAPATEO TINKU POTOSÍ: Fuerza andina rítmica con pisada firme y guardia alta
+        const st = Math.sin(w * 2.0);
+        const hop = Math.abs(Math.sin(w * 2.0));
+        applySmoothPose(d, {
+          ry: 0.06 + hop * 0.18, rz: 0.22, rotY: st * 0.26,
+          tx: 0.12, ty: st * 0.30, tz: -st * 0.14,
+          alx: -1.55 + st * 0.40, alz: 0.65, ael: -1.10,
+          arx: -1.55 - st * 0.40, arz: -0.65, aer: -1.10,
+          llx: -0.75 * Math.max(0, st) + 0.18, llz: -0.16, lkl: Math.max(0, st) * 1.05,
+          lrx: -0.75 * Math.max(0, -st) + 0.18, lrz: 0.16, lkr: Math.max(0, -st) * 1.05
+        }, 0.24);
+      } else if (stepAnim === 'morenada') {
+        // 11. GIRO MORENADA IMPERIAL: Cadencia majestuosa con giro lento y vuelo de pollera
+        const sway = Math.sin(w * 1.1);
+        applySmoothPose(d, {
+          ry: 0.08 + Math.abs(sway) * 0.06, rz: 0.30, spinSpeed: 0.17,
+          tx: -0.06, tz: sway * 0.12,
+          alx: -1.25, alz: 1.32, ael: -0.52,
+          arx: -1.25, arz: -1.32, aer: -0.52,
+          llx: sway * 0.36, llz: -0.12, lkl: 0.34,
+          lrx: -sway * 0.36, lrz: 0.12, lkr: 0.34
+        }, 0.20);
+      } else if (stepAnim === 'chiquitano') {
+        // 12. ABÁNICO CHIQUITANO: Despliegue señorial de brazos en arco y pose real
+        const arc = Math.sin(w * 1.25);
+        applySmoothPose(d, {
+          rx: arc * 0.45, ry: 0.07, rz: 0.40, rotY: arc * 0.55,
+          tx: -0.10, ty: -arc * 0.24, hy: arc * 0.20,
+          alx: -1.95 + arc * 0.30, alz: 1.05, ael: -0.30,
+          arx: -1.95 - arc * 0.30, arz: -1.05, aer: -0.30,
+          llx: -0.22, llz: -0.14, lkl: 0.22,
+          lrx: 0.22, lrz: 0.14, lkr: 0.12
+        }, 0.19);
+      } else {
+        // 8. BALANZA ARABESQUE: Equilibrio editorial en un pie + rotación panorámica 180°
+        applySmoothPose(d, {
+          ry: 0.10, rz: 0.25, rotY: Math.sin(phase * 1.9) * 1.15,
+          tx: 0.32, tz: 0.08, hx: -0.22,
+          alx: -1.85, alz: 0.42, ael: -0.12,
+          arx: 0.55, arz: -1.25, aer: -0.18,
+          llx: 0.04, llz: 0, lkl: 0.05,
+          lrx: 1.12, lrz: 0.16, lkr: 0.16
+        }, 0.18);
+      }
+      return;
+    }
+
+    // Groove elegante en el centro de la pasarela entre pasos
+    const amp = 0.48 + energy * 0.45;
+    applySmoothPose(d, {
+      ry: bounce * 0.07 * amp,
+      ty: Math.cos(beat * 0.5) * 0.22 * amp,
+      tz: groove * 0.12 * amp,
+      hx: bounce * 0.08, hy: Math.sin(beat * 0.5) * 0.10,
+      alx: -0.42 + Math.sin(beat) * 0.48 * amp, alz: 0.38 + Math.abs(groove) * 0.36 * amp, ael: -0.62,
+      arx: -0.42 - Math.sin(beat) * 0.48 * amp, arz: -0.38 - Math.abs(groove) * 0.36 * amp, aer: -0.62,
+      llx: Math.sin(beat) * 0.32 * amp, lkl: bounce * 0.26 * amp,
+      lrx: -Math.sin(beat) * 0.32 * amp, lkr: bounce * 0.26 * amp
+    }, 0.18);
+  }
+
+  // =========================================================================
+  // 7. CONSTRUCTORES DE ENTORNO BOLIVIANO CAMBA (SANTA CRUZ DE LA SIERRA 3D)
+  // =========================================================================
+  function createPalmTree(x, z, scale) {
+    const grp = new THREE.Group();
+    const s = scale || 1;
+    const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4c35 });
+    const leafMat = new THREE.MeshLambertMaterial({ color: 0x15803d, side: THREE.DoubleSide });
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.24 * s, 5.2 * s, 8), trunkMat);
+    trunk.position.y = 2.6 * s;
+    trunk.rotation.z = 0.06;
+    grp.add(trunk);
+    const crown = new THREE.Group();
+    crown.position.set(0.15 * s, 5.1 * s, 0);
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      const frond = new THREE.Mesh(new THREE.ConeGeometry(0.52 * s, 2.5 * s, 4), leafMat);
+      frond.scale.set(1, 1, 0.16);
+      frond.position.set(Math.cos(a) * 1.15 * s, -0.1 * s, Math.sin(a) * 1.15 * s);
+      frond.rotation.z = -Math.PI * 0.38;
+      frond.rotation.y = -a;
+      crown.add(frond);
+    }
+    grp.add(crown);
+    grp.position.set(x, 0, z);
+    return { grp, crown };
+  }
+
+  function createTajiboTree(x, z, pinkFlower) {
+    const grp = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.28, 3.0, 8), new THREE.MeshLambertMaterial({ color: 0x5c3d28 }));
+    trunk.position.y = 1.5;
+    const flowerMat = new THREE.MeshLambertMaterial({ color: pinkFlower ? 0xec4899 : 0xfacc15 });
+    const c1 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.55, 1), flowerMat);
+    c1.scale.set(1.15, 0.85, 1.15); c1.position.y = 3.6;
+    const c2 = new THREE.Mesh(new THREE.DodecahedronGeometry(1.05, 0), flowerMat);
+    c2.position.set(0.7, 3.3, 0.45);
+    grp.add(trunk, c1, c2);
+    grp.position.set(x, 0, z);
+    return grp;
+  }
+
+  function createRecovaBuilding(x, z, rotY) {
+    const grp = new THREE.Group();
+    const wallMat = new THREE.MeshLambertMaterial({ color: 0xf1e5d3 });
+    const roofMat = new THREE.MeshLambertMaterial({ color: 0xa3432c });
+    const winMat = new THREE.MeshBasicMaterial({ color: 0xfef3c7 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(9.6, 5.2, 4.6), wallMat);
+    body.position.set(0, 2.6, -1.0);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(10.4, 0.55, 6.8), roofMat);
+    roof.position.set(0, 5.4, -0.1); roof.rotation.x = 0.16;
+    const shop = new THREE.Mesh(new THREE.PlaneGeometry(7.8, 2.4), winMat);
+    shop.position.set(0, 1.7, 1.32);
+    grp.add(body, roof, shop);
+    for (let i = -2; i <= 2; i++) {
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 5.1, 8), wallMat);
+      col.position.set(i * 2.1, 2.55, 2.35);
+      grp.add(col);
+    }
+    grp.position.set(x, 0, z);
+    grp.rotation.y = rotY;
+    return grp;
+  }
+
+  function createCatedralSanLorenzo(x, z) {
+    const grp = new THREE.Group();
+    const brickMat = new THREE.MeshLambertMaterial({ color: 0x9a3d27 });
+    const trimMat = new THREE.MeshLambertMaterial({ color: 0xe7d6bf });
+    const goldMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const nave = new THREE.Mesh(new THREE.BoxGeometry(12, 9.5, 7), brickMat);
+    nave.position.y = 4.75;
+    grp.add(nave);
+    [-4.4, 4.4].forEach((tx) => {
+      const tower = new THREE.Mesh(new THREE.BoxGeometry(3.0, 16.5, 3.0), brickMat);
+      tower.position.set(tx, 8.25, 1.6);
+      const dome = new THREE.Mesh(new THREE.SphereGeometry(1.5, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), trimMat);
+      dome.position.set(tx, 16.5, 1.6);
+      const cross = new THREE.Mesh(new THREE.BoxGeometry(0.18, 1.4, 0.18), goldMat);
+      cross.position.set(tx, 18.2, 1.6);
+      grp.add(tower, dome, cross);
+    });
+    const rose = new THREE.Mesh(new THREE.CircleGeometry(1.3, 18), new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+    rose.position.set(0, 6.8, 3.55);
+    grp.add(rose);
+    grp.position.set(x, 0, z);
+    return grp;
+  }
+
+  function createCristoRedentor(x, z) {
+    const grp = new THREE.Group();
+    const marbleMat = new THREE.MeshLambertMaterial({ color: 0xf1f5f9 });
+    const bronzeMat = new THREE.MeshLambertMaterial({ color: 0x8c6d46 });
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 2.4, 7.2, 8), marbleMat);
+    ped.position.y = 3.6;
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.72, 5.4, 12), bronzeMat);
+    body.position.y = 9.9;
+    const arms = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.48, 0.48), bronzeMat);
+    arms.position.y = 11.6;
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.48, 10, 10), bronzeMat);
+    head.position.y = 13.0;
+    grp.add(ped, body, arms, head);
+    grp.position.set(x, 0, z);
+    return grp;
+  }
+
+  function buildSantaCruzUrbanMap() {
+    clearWorld();
+    const g = new THREE.Group();
+    scene.background = new THREE.Color(0x2c1f3a);
+    scene.fog = new THREE.Fog(0x3a2540, 38, 104);
+
+    // Domo de cielo cruceño al atardecer 360°
+    const skyDome = new THREE.Mesh(
+      new THREE.SphereGeometry(135, 32, 20),
+      new THREE.MeshBasicMaterial({ map: getCambaSunsetSkyTexture(), side: THREE.BackSide, fog: false })
+    );
+    g.add(skyDome);
+
+    // Suelo urbano de Santa Cruz
+    const ground = new THREE.Mesh(
+      new THREE.PlaneGeometry(120, 120),
+      new THREE.MeshLambertMaterial({ color: 0x222634 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    g.add(ground);
+
+    // Plaza 24 de Septiembre central con travertino cruceño
+    const plaza = new THREE.Mesh(
+      new THREE.CylinderGeometry(11.8, 12.2, 0.14, 36),
+      new THREE.MeshLambertMaterial({ map: getPlazaTravertineTexture() })
+    );
+    plaza.position.y = 0.07;
+    g.add(plaza);
+
+    // Avenidas principales (Anillos / Monseñor Rivero)
+    const roadMat = new THREE.MeshLambertMaterial({ color: 0x161924 });
+    const roadNS = new THREE.Mesh(new THREE.PlaneGeometry(8.5, 98), roadMat);
+    roadNS.rotation.x = -Math.PI / 2; roadNS.position.y = 0.02; g.add(roadNS);
+    const roadEW = new THREE.Mesh(new THREE.PlaneGeometry(98, 8.5), roadMat);
+    roadEW.rotation.x = -Math.PI / 2; roadEW.position.y = 0.025; g.add(roadEW);
+
+    const dashMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    for (let i = -40; i <= 40; i += 6) {
+      if (Math.abs(i) < 12) continue;
+      const d1 = new THREE.Mesh(new THREE.PlaneGeometry(0.28, 2.4), dashMat);
+      d1.rotation.x = -Math.PI / 2; d1.position.set(0, 0.04, i); g.add(d1);
+      const d2 = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.28), dashMat);
+      d2.rotation.x = -Math.PI / 2; d2.position.set(i, 0.04, 0); g.add(d2);
+    }
+
+    // Banderas de Bolivia y Santa Cruz en la Plaza Central
+    const poleMat = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
+    const flags = [];
+    [{ x: -7.5, z: -7.5, kind: 'bolivia' }, { x: 7.5, z: -7.5, kind: 'scz' }].forEach((fl) => {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.11, 7.2, 8), poleMat);
+      pole.position.set(fl.x, 3.6, fl.z);
+      const cloth = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.4, 1.45),
+        new THREE.MeshBasicMaterial({ map: getFlagTexture(fl.kind), side: THREE.DoubleSide })
+      );
+      cloth.position.set(fl.x + 1.2, 6.4, fl.z);
+      g.add(pole, cloth);
+      flags.push(cloth);
+    });
+
+    const obstacles = [];
+
+    // 1. Catedral Metropolitana Basílica de San Lorenzo (Norte)
+    const catedral = createCatedralSanLorenzo(0, -37);
+    g.add(catedral);
+    obstacles.push({ x: 0, z: -37, hw: 7, hd: 4.5 });
+
+    // 2. Monumento al Cristo Redentor (Oeste)
+    const cristo = createCristoRedentor(-34, -18);
+    cristo.rotation.y = 0.7;
+    g.add(cristo);
+    obstacles.push({ x: -34, z: -18, hw: 3.5, hd: 3.5 });
+
+    // 3. Torres Manzana 40 & Green Tower (Equipetrol — Este)
+    const glassTex = getBuildingFacadeTexture('#20334d', '#fde68a');
+    const towerMat = new THREE.MeshLambertMaterial({ map: glassTex });
+    const goldTop = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    [[34, -22, 7.5, 26, 7.5], [36, -11, 6.8, 22, 6.8], [34, 24, 8, 20, 8]].forEach(([tx, tz, tw, th, td]) => {
+      const twMesh = new THREE.Mesh(new THREE.BoxGeometry(tw, th, td), towerMat);
+      twMesh.position.set(tx, th / 2, tz);
+      const crown = new THREE.Mesh(new THREE.BoxGeometry(tw + 0.25, 0.45, td + 0.25), goldTop);
+      crown.position.set(tx, th + 0.2, tz);
+      g.add(twMesh, crown);
+      obstacles.push({ x: tx, z: tz, hw: tw / 2 + 0.8, hd: td / 2 + 0.8 });
+    });
+
+    // 4. Recovas Coloniales Cruceñas bordeando la ciudad
+    const recovaSpecs = [
+      [-17, -23, 0.2], [17, -23, -0.2],
+      [-34, 10, Math.PI / 2], [35, 9, -Math.PI / 2],
+      [-11, 35, Math.PI], [12, 35, Math.PI]
+    ];
+    recovaSpecs.forEach(([rx, rz, rot]) => {
+      g.add(createRecovaBuilding(rx, rz, rot));
+      obstacles.push({ x: rx, z: rz, hw: 5.2, hd: 3.8 });
+    });
+
+    // 5. Palmeras Motacú y Tajibos en Flor (Rosados y Amarillos)
+    const palmCrowns = [];
+    [[-12, -12], [12, -12], [-12, 12], [12, 12], [-27, 16], [27, 16], [-18, -12], [18, -12]].forEach(([px, pz], idx) => {
+      const p = createPalmTree(px, pz, idx % 2 === 0 ? 1.05 : 0.9);
+      g.add(p.grp);
+      palmCrowns.push(p.crown);
+    });
+    [[-15, 14, true], [15, 14, false], [-28, -26, true], [26, -28, false], [-28, 30, false], [26, 32, true]].forEach(([tx, tz, isPink]) => {
+      g.add(createTajiboTree(tx, tz, isPink));
+    });
+
+    // Farolas coloniales cálidas
+    const ironMat = new THREE.MeshLambertMaterial({ color: 0x1e293b });
+    const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfff3c4 });
+    [[-7, -14], [7, -14], [-7, 14], [7, 14], [-18, -4], [18, -4]].forEach(([lx, lz]) => {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 5.0, 8), ironMat);
+      pole.position.set(lx, 2.5, lz);
+      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 8), bulbMat);
+      bulb.position.set(lx, 5.1, lz);
+      g.add(pole, bulb);
+    });
+
+    // 6. 5 PUERTAS DE PASARELA BOLIVIANAS
+    const doorObjs = [];
+    STAGES.forEach((st) => {
+      const doorGroup = new THREE.Group();
+      doorGroup.position.set(st.doorPos.x, 0, st.doorPos.z);
+      doorGroup.lookAt(0, 0, 0);
+
+      const isUnlocked = state.level >= st.levelReq;
+      const isCleared = state.cleared[st.id];
+      const frameColor = isCleared ? 0x34d399 : (isUnlocked ? st.accent : 0xef4444);
+
+      const pillarMat = new THREE.MeshLambertMaterial({ color: 0xf1e5d3 });
+      const glowMat = new THREE.MeshBasicMaterial({ color: frameColor });
+      const leftP = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.30, 4.3, 10), pillarMat);
+      leftP.position.set(-1.65, 2.15, 0); doorGroup.add(leftP);
+      const rightP = leftP.clone(); rightP.position.x = 1.65; doorGroup.add(rightP);
+      const topArch = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.55, 0.68), new THREE.MeshLambertMaterial({ color: 0x9a3d27 }));
+      topArch.position.set(0, 4.4, 0); doorGroup.add(topArch);
+
+      const neonTop = new THREE.Mesh(new THREE.BoxGeometry(4.1, 0.20, 0.74), glowMat);
+      neonTop.position.set(0, 4.75, 0); doorGroup.add(neonTop);
+
+      const portal = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.8, 4.0),
+        new THREE.MeshBasicMaterial({ color: frameColor, transparent: true, opacity: isUnlocked ? 0.38 : 0.15, side: THREE.DoubleSide })
+      );
+      portal.position.set(0, 2.05, 0);
+      doorGroup.add(portal);
+
+      const pad = new THREE.Mesh(
+        new THREE.RingGeometry(1.75, 2.35, 24),
+        new THREE.MeshBasicMaterial({ color: frameColor, side: THREE.DoubleSide, transparent: true, opacity: 0.78 })
+      );
+      pad.rotation.x = -Math.PI / 2; pad.position.y = 0.06;
+      doorGroup.add(pad);
+
+      let beacon = null;
+      if (isUnlocked && !isCleared) {
+        beacon = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.28, 0.85, 22, 12, 1, true),
+          new THREE.MeshBasicMaterial({ color: st.accent, transparent: true, opacity: 0.22, side: THREE.DoubleSide })
+        );
+        beacon.position.y = 11;
+        doorGroup.add(beacon);
+      }
+
+      g.add(doorGroup);
+      doorObjs.push({ stage: st, group: doorGroup, portal, pad, beacon, isUnlocked, isCleared });
+    });
+
+    // 7. MODELO DE ALTA MODA DE LA JUGADORA EN EL MAPA
+    const playerSpec = PLAYER_OUTFITS[state.outfitIndex] || PLAYER_OUTFITS[0];
+    const player = createCoutureFemaleModel(playerSpec, state.level > 1);
+    player.root.position.set(state.playerPos.x, 0, state.playerPos.z);
+    player.root.rotation.y = state.playerYaw;
+    g.add(player.root);
+
+    // Puntero dorado flotante hacia la siguiente pasarela
+    const pointer = new THREE.Mesh(
+      new THREE.ConeGeometry(0.20, 0.50, 4),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+    );
+    pointer.rotation.x = Math.PI / 2;
+    pointer.position.set(0, 2.55, 0);
+    g.add(pointer);
+
+    scene.add(g);
+    activeWorldGroup = g;
+    mapRefs = { player, doorObjs, obstacles, pointer, palmCrowns, flags };
+  }
+
+  // =========================================================================
+  // 8. ARENA DE BATALLA 3D TEMÁTICA BOLIVIANA (ALTA MODA VS ALTA MODA)
+  // =========================================================================
+  function buildBattleArena(stage) {
+    clearWorld();
+    const g = new THREE.Group();
+    scene.background = new THREE.Color(stage.sky);
+    scene.fog = new THREE.Fog(stage.sky, 18, 56);
+
+    const skyDome = new THREE.Mesh(
+      new THREE.SphereGeometry(90, 28, 18),
+      new THREE.MeshBasicMaterial({ map: getCambaSunsetSkyTexture(), side: THREE.BackSide, fog: false })
+    );
+    g.add(skyDome);
+
+    // Pasarela circular de piedra cálida con borde dorado y esmeralda
+    const floor = new THREE.Mesh(
+      new THREE.CylinderGeometry(8.6, 9.2, 0.5, 36),
+      new THREE.MeshLambertMaterial({ map: getPlazaTravertineTexture() })
+    );
+    floor.position.y = -0.25;
+    g.add(floor);
+
+    const outerRing = new THREE.Mesh(
+      new THREE.RingGeometry(7.4, 8.1, 36),
+      new THREE.MeshBasicMaterial({ color: stage.accent, side: THREE.DoubleSide })
+    );
+    outerRing.rotation.x = -Math.PI / 2; outerRing.position.y = 0.03;
+    g.add(outerRing);
+
+    // Escenografía de fondo específica del escenario boliviano
+    if (stage.theme === 'plaza24') {
+      const cat = createCatedralSanLorenzo(0, -18);
+      cat.scale.set(0.8, 0.8, 0.8);
+      g.add(cat);
+      g.add(createTajiboTree(-7.5, -8, true), createTajiboTree(7.5, -8, false));
+    } else if (stage.theme === 'cristo') {
+      const cr = createCristoRedentor(0, -16);
+      g.add(cr);
+      g.add(createPalmTree(-7, -7, 0.9).grp, createPalmTree(7, -7, 0.9).grp);
+    } else {
+      // Equipetrol / Urubó / Cambódromo: palmeras, tajibos, banderas bolivianas y torres iluminadas
+      g.add(createPalmTree(-8, -8, 1.0).grp, createPalmTree(8, -8, 1.0).grp);
+      g.add(createTajiboTree(-10, -4, true), createTajiboTree(10, -4, false));
+      const bMat = new THREE.MeshLambertMaterial({ map: getBuildingFacadeTexture('#20334d', '#fde68a') });
+      [-10, -5, 5, 10].forEach((bx, idx) => {
+        const h = 11 + (idx % 2) * 5;
+        const t = new THREE.Mesh(new THREE.BoxGeometry(3.4, h, 3.4), bMat);
+        t.position.set(bx, h / 2 - 1, -18);
+        g.add(t);
+      });
+    }
+
+    // Banderas de Bolivia y Santa Cruz flanqueando la pasarela
+    const poleMat = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
+    [{ x: -5.6, kind: 'bolivia' }, { x: 5.6, kind: 'scz' }].forEach((fl) => {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 5.4, 8), poleMat);
+      pole.position.set(fl.x, 2.7, -5.5);
+      const cloth = new THREE.Mesh(
+        new THREE.PlaneGeometry(1.8, 1.1),
+        new THREE.MeshBasicMaterial({ map: getFlagTexture(fl.kind), side: THREE.DoubleSide })
+      );
+      cloth.position.set(fl.x + (fl.x < 0 ? 0.9 : -0.9), 4.8, -5.5);
+      g.add(pole, cloth);
+    });
+
+    // Foco central de pasarela solista (cada modelo tiene su espacio de tiempo aquí)
+    const spotlightPad = new THREE.Mesh(
+      new THREE.RingGeometry(1.35, 1.68, 32),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide, transparent: true, opacity: 0.85 })
+    );
+    spotlightPad.rotation.x = -Math.PI / 2;
+    spotlightPad.position.set(0, 0.04, 0.55);
+    g.add(spotlightPad);
+
+    const spotlightBeam = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.75, 1.85, 9.5, 18, 1, true),
+      new THREE.MeshBasicMaterial({ color: stage.accent, transparent: true, opacity: 0.11, side: THREE.DoubleSide, depthWrite: false })
+    );
+    spotlightBeam.position.set(0, 4.75, 0.55);
+    g.add(spotlightBeam);
+
+    // Modelo Jugadora (espera en palco izquierdo durante Turno 1, luego pasa al centro)
+    const playerSpec = PLAYER_OUTFITS[state.outfitIndex] || PLAYER_OUTFITS[0];
+    const player = createCoutureFemaleModel(playerSpec, true);
+    player.root.position.set(-3.25, 0, -1.55);
+    player.root.rotation.y = 0.52;
+    g.add(player.root);
+
+    // Modelo Rival Alta Moda CPU (inicia en el foco central durante Turno 1)
+    const rival = createCoutureFemaleModel(stage.rivalModel, true);
+    rival.root.position.set(0, 0, 0.55);
+    rival.root.rotation.y = 0;
+    g.add(rival.root);
+
+    // Partículas ligeras de destello dorado/tajibo en hits
+    const particles = [];
+    for (let i = 0; i < 18; i++) {
+      const m = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.11, 0),
+        new THREE.MeshBasicMaterial({ color: stage.accent })
+      );
+      m.visible = false;
+      g.add(m);
+      particles.push({ mesh: m, vx: 0, vy: 0, vz: 0, life: 0 });
+    }
+
+    scene.add(g);
+    activeWorldGroup = g;
+    // Aro expansivo de impacto visual en cada paso
+    const shockRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.55, 0.78, 32),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide, transparent: true, opacity: 0 })
+    );
+    shockRing.rotation.x = -Math.PI / 2;
+    shockRing.position.set(0, 0.06, 0.55);
+    g.add(shockRing);
+
+    battleRefs = { player, rival, particles, stage, spotlightPad, spotlightBeam, shockRing, shockLife: 0 };
+  }
+
+  function spawnBattleBurst(x, colorHex) {
+    if (!battleRefs) return;
+    let count = 0;
+    for (let i = 0; i < battleRefs.particles.length && count < 7; i++) {
+      const p = battleRefs.particles[i];
+      if (p.life <= 0) {
+        p.mesh.visible = true;
+        p.mesh.material.color.set(colorHex);
+        p.mesh.position.set(x, 1.35, 0.35);
+        p.vx = (Math.random() - 0.5) * 0.14;
+        p.vy = 0.08 + Math.random() * 0.12;
+        p.vz = (Math.random() - 0.5) * 0.14;
+        p.life = 0.55;
+        count++;
+      }
+    }
+  }
+
+  // =========================================================================
+  // 9. PASARELA POR TURNOS + CONSOLA MODEL BOLIVIA 2026 & EVALUACIÓN DE RITMO
+  // =========================================================================
+  const rhythmCanvas = document.getElementById('rhythm-canvas');
+  const rCtx = rhythmCanvas.getContext('2d');
+  const radarCanvas = document.getElementById('radar-canvas');
+  const mCtx = radarCanvas.getContext('2d');
+
+  function buildStepConsoleUI() {
+    const grid = document.getElementById('step-console-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+    RUNWAY_STEPS.forEach((st) => {
+      const btn = document.createElement('button');
+      btn.className = 'step-pad';
+      btn.setAttribute('data-step', String(st.id));
+      btn.innerHTML = `<span class="sp-ico">${st.emoji}</span><span class="sp-lbl">${st.short}</span><span class="sp-key">${st.key} / ${st.num}</span>`;
+      btn.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        handleStepTrigger(st.id);
+      });
+      grid.appendChild(btn);
+    });
+  }
+
+  function resizeCanvases() {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+
+    const rWrap = document.getElementById('rhythm-track-wrap');
+    if (rWrap && rWrap.clientWidth > 0) {
+      rhythmCanvas.width = rWrap.clientWidth;
+      rhythmCanvas.height = rWrap.clientHeight;
+    }
+  }
+
+  function buildBeatsTimeline(bpm, durationSec, rate) {
+    // Más tiempo y respiro entre pulsos para variar pasos y lucir cada coreografía completa
+    const beatSec = 60 / bpm;
+    const beats = [];
+    let t = 2.0;
+    while (t < durationSec - 1.5) {
+      const stepBeats = (rate > 1.35 && Math.random() < 0.30) ? 1.5 : 2.0;
+      beats.push({ time: t, hit: false, missed: false });
+      t += beatSec * stepBeats;
+    }
+    return beats;
+  }
+
+  function triggerStageShowcaseFX(colorHex, withFlash) {
+    if (battleRefs) {
+      if (battleRefs.spotlightBeam) battleRefs.spotlightBeam.material.color.set(colorHex);
+      if (battleRefs.spotlightPad) battleRefs.spotlightPad.material.color.set(colorHex);
+      if (battleRefs.shockRing) {
+        battleRefs.shockRing.material.color.set(colorHex);
+        battleRefs.shockRing.scale.set(1, 1, 1);
+        battleRefs.shockRing.material.opacity = 0.88;
+        battleRefs.shockLife = 0.55;
+      }
+      spawnBattleBurst(0, colorHex);
+    }
+    if (withFlash) {
+      const fl = document.getElementById('paparazzi-flash');
+      if (fl) {
+        fl.classList.add('flash');
+        setTimeout(() => fl.classList.remove('flash'), 120);
+      }
+    }
+  }
+
+  function startBattle(stage) {
+    state.mode = 'battle';
+    state.autoWalk = false;
+    state.nearbyDoor = null;
+    updateMapHUDVisibility();
+
+    buildBattleArena(stage);
+    buildStepConsoleUI();
+    resizeCanvases();
+
+    const rivalDuration = 18;
+    const playerDuration = 36 + stage.id * 3;
+    const effBpm = state.manualBpm || stage.bpm;
+    const rivalBeats = buildBeatsTimeline(effBpm, rivalDuration, 1.0);
+    const playerBeats = buildBeatsTimeline(effBpm, playerDuration, stage.notesRate);
+
+    state.battle = {
+      stage,
+      phase: 'rival', // 'rival' -> 'transition' -> 'player'
+      phaseElapsed: 0,
+      rivalDuration,
+      playerDuration,
+      rivalBeats,
+      playerBeats,
+      // Consola Rival (Turno 1)
+      rivalScore: 0,
+      rivalRhythmSum: 0,
+      rivalJudged: 0,
+      rivalStepsUsed: new Set(),
+      rivalLastStep: 0,
+      // Consola Jugadora (Turno 2)
+      playerScore: 0,
+      playerRhythmSum: 0,
+      playerJudged: 0,
+      playerHits: 0,
+      playerStepsUsed: new Set(),
+      playerLastStep: -1,
+      suggestedStep: Math.floor(Math.random() * RUNWAY_STEPS.length),
+      combo: 0,
+      maxCombo: 0,
+      flow: 0,
+      overdriveTime: 0
+    };
+
+    const pSpec = PLAYER_OUTFITS[state.outfitIndex] || PLAYER_OUTFITS[0];
+    document.getElementById('b-player-name').textContent = pSpec.name;
+    document.getElementById('b-rival-name').textContent = stage.rival;
+    document.getElementById('battle-stage-name').textContent = stage.short;
+    document.getElementById('battle-ui').classList.add('active');
+    document.getElementById('btn-exit-battle').style.display = 'inline-flex';
+    document.getElementById('radar-box').style.display = 'none';
+
+    document.getElementById('rival-watch-bar').classList.add('active');
+    document.getElementById('rhythm-zone').classList.remove('active');
+    document.getElementById('tag-rival').classList.add('spotlight');
+    document.getElementById('tag-player').classList.remove('spotlight');
+
+    updateStepHighlights();
+    updateBattleHUD();
+    audio.playTurnTrack(stage, true);
+  }
+
+  function simulateRivalBeat(b, silent) {
+    const stage = b.stage;
+    // Elegir un paso variado de Model Bolivia 2026
+    let stepIdx = Math.floor(Math.random() * RUNWAY_STEPS.length);
+    if (stepIdx === b.rivalLastStep) stepIdx = (stepIdx + 1) % RUNWAY_STEPS.length;
+    b.rivalLastStep = stepIdx;
+    const stepObj = RUNWAY_STEPS[stepIdx];
+    b.rivalStepsUsed.add(stepIdx);
+
+    // Calibrar precisión rítmica de la rival según el nivel de la pasarela
+    const roll = Math.random();
+    let syncVal = 0;
+    let pts = 0;
+    if (roll < stage.difficulty * 0.62) {
+      syncVal = 100; pts = 160;
+    } else if (roll < stage.difficulty * 0.96) {
+      syncVal = 78; pts = 105;
+    } else {
+      syncVal = 35; pts = 30;
+    }
+    b.rivalRhythmSum += syncVal;
+    b.rivalJudged++;
+    b.rivalScore += pts + b.rivalStepsUsed.size * 10;
+
+    if (!silent) {
+      const liveEl = document.getElementById('rival-step-live');
+      if (liveEl) liveEl.textContent = `${stepObj.emoji} ${stage.rival} ejecuta: ${stepObj.name}`;
+      if (battleRefs) {
+        battleRefs.rival.activeStep = stepObj.anim;
+        battleRefs.rival.moveDuration = 1.75;
+        battleRefs.rival.moveTimer = 1.75;
+        triggerStageShowcaseFX(stepObj.color, stepObj.anim === 'vogue' || stepObj.anim === 'gala_bow');
+      }
+    }
+  }
+
+  function beginTurnTransition() {
+    const b = state.battle;
+    if (!b || b.phase !== 'rival') return;
+    // Completar cualquier pulso pendiente de la rival para que su marca de ritmo sea justa
+    for (let i = 0; i < b.rivalBeats.length; i++) {
+      if (!b.rivalBeats[i].hit) {
+        b.rivalBeats[i].hit = true;
+        simulateRivalBeat(b, true);
+      }
+    }
+    b.phase = 'transition';
+    b.phaseElapsed = 0;
+    document.getElementById('rival-watch-bar').classList.remove('active');
+    document.getElementById('rhythm-zone').classList.remove('active');
+    showJudgment('🌟 ¡TU TURNO EN PASARELA!', '#facc15');
+    audio.sfxOverdrive();
+    updateBattleHUD();
+  }
+
+  function startPlayerTurn() {
+    const b = state.battle;
+    if (!b) return;
+    b.phase = 'player';
+    b.phaseElapsed = 0;
+    document.getElementById('rhythm-zone').classList.add('active');
+    document.getElementById('tag-rival').classList.remove('spotlight');
+    document.getElementById('tag-player').classList.add('spotlight');
+    resizeCanvases();
+    updateStepHighlights();
+    updateBattleHUD();
+    audio.playTurnTrack(b.stage, true);
+  }
+
+  function updateStepHighlights() {
+    const b = state.battle;
+    if (!b) return;
+    document.querySelectorAll('.step-pad').forEach((btn) => {
+      const idx = parseInt(btn.getAttribute('data-step'), 10);
+      btn.classList.toggle('suggested', idx === b.suggestedStep);
+      btn.classList.toggle('used', b.playerStepsUsed.has(idx));
+    });
+  }
+
+  function showJudgment() {
+    // Pantalla limpia sin anuncios flotantes sobre los personajes 3D
+  }
+
+  function handleStepTrigger(stepIdx) {
+    if (state.mode !== 'battle' || !state.battle) return;
+    const b = state.battle;
+    if (b.phase !== 'player') return;
+    audio.init();
+
+    const stepObj = RUNWAY_STEPS[stepIdx] || RUNWAY_STEPS[0];
+    const pad = document.querySelector('.step-pad[data-step="' + stepIdx + '"]');
+    if (pad) {
+      pad.classList.add('pressed');
+      setTimeout(() => pad.classList.remove('pressed'), 120);
+    }
+
+    // Ejecutar inmediatamente el paso elegido en la modelo 3D (modalidad Model Bolivia 2026)
+    if (battleRefs) {
+      battleRefs.player.activeStep = stepObj.anim;
+      battleRefs.player.moveDuration = 1.95;
+      battleRefs.player.moveTimer = 1.95;
+    }
+
+    // Buscar el pulso rítmico más cercano
+    let best = null;
+    let bestDiff = 999;
+    for (let i = 0; i < b.playerBeats.length; i++) {
+      const beat = b.playerBeats[i];
+      if (!beat.hit && !beat.missed) {
+        const diff = Math.abs(beat.time - b.phaseElapsed);
+        if (diff < bestDiff) { bestDiff = diff; best = beat; }
+      }
+    }
+
+    if (best && bestDiff <= 0.38) {
+      best.hit = true;
+      b.playerHits++;
+      b.playerJudged++;
+      b.combo++;
+      if (b.combo > b.maxCombo) b.maxCombo = b.combo;
+
+      const isPerfect = bestDiff <= 0.18;
+      const isNewStep = !b.playerStepsUsed.has(stepIdx);
+      const isVarietySwitch = (b.playerLastStep !== stepIdx);
+      const isSuggested = (stepIdx === b.suggestedStep);
+      b.playerStepsUsed.add(stepIdx);
+      b.playerLastStep = stepIdx;
+
+      // Precisión de ritmo pura + bonificación por variedad de pasos Model Bolivia
+      const baseSync = isPerfect ? 100 : 80;
+      const syncBonus = isSuggested ? 8 : (isVarietySwitch ? 4 : 0);
+      b.playerRhythmSum += Math.min(100, baseSync + syncBonus);
+
+      const mult = b.overdriveTime > 0 ? 2 : 1;
+      const varietyBonus = (isNewStep ? 60 : (isVarietySwitch ? 25 : 0)) + (isSuggested ? 75 : 0);
+      const pts = ((isPerfect ? 160 : 105) + varietyBonus) * mult + Math.min(b.combo * 10, 140);
+      b.playerScore += pts;
+      b.flow = Math.min(100, b.flow + (isPerfect ? 14 : 9) + (isVarietySwitch ? 4 : 0));
+
+      if (isSuggested) {
+        showJudgment(`⭐ ¡${stepObj.short.toUpperCase()} +BONUS!`, '#facc15');
+        let nextSug = Math.floor(Math.random() * RUNWAY_STEPS.length);
+        if (nextSug === stepIdx) nextSug = (nextSug + 1) % RUNWAY_STEPS.length;
+        b.suggestedStep = nextSug;
+      } else {
+        showJudgment(isPerfect ? `¡RITMO PERFECTO! ${stepObj.emoji}` : `¡EN RITMO! ${stepObj.emoji}`, isPerfect ? '#facc15' : '#34d399');
+      }
+      audio.sfxHit(isPerfect ? 'PERFECT' : 'GREAT');
+      triggerStageShowcaseFX(stepObj.color, stepObj.anim === 'vogue' || stepObj.anim === 'gala_bow');
+    } else {
+      b.combo = 0;
+      b.playerJudged++;
+      b.playerRhythmSum += 20;
+      showJudgment('FUERA DE RITMO', '#f43f5e');
+      audio.sfxHit('MISS');
+    }
+
+    document.getElementById('active-step-pill').textContent = `${stepObj.emoji} ${stepObj.short} • ${b.combo}x`;
+    updateStepHighlights();
+    updateBattleHUD();
+  }
+
+  function triggerOverdrive() {
+    if (state.mode !== 'battle' || !state.battle) return;
+    const b = state.battle;
+    if (b.phase !== 'player' || b.flow < 100) return;
+    b.flow = 0;
+    b.overdriveTime = 6.5;
+    b.playerScore += 450;
+    showJudgment('✨ GALA FLOW x2!', '#facc15');
+    audio.sfxOverdrive();
+    if (battleRefs) {
+      battleRefs.player.activeStep = 'pirouette';
+      battleRefs.player.moveTimer = 1.25;
+      spawnBattleBurst(0, '#facc15');
+    }
+    updateBattleHUD();
+  }
+
+  function getRhythmMetrics(b) {
+    const rBase = b.rivalJudged > 0 ? Math.round(b.rivalRhythmSum / b.rivalJudged) : 0;
+    const pBase = b.playerJudged > 0 ? Math.round(b.playerRhythmSum / b.playerJudged) : 0;
+    return { pPct: Math.min(100, pBase), rPct: Math.min(100, rBase) };
+  }
+
+  function updateBattleHUD() {
+    const b = state.battle;
+    if (!b) return;
+    let left = 0;
+    if (b.phase === 'rival') left = Math.max(0, Math.ceil(b.rivalDuration - b.phaseElapsed));
+    else if (b.phase === 'transition') left = Math.max(1, Math.ceil(2.0 - b.phaseElapsed));
+    else left = Math.max(0, Math.ceil(b.playerDuration - b.phaseElapsed));
+    document.getElementById('battle-timer').textContent = left;
+
+    const { pPct, rPct } = getRhythmMetrics(b);
+    document.getElementById('j-player-rhythm').textContent = 'TÚ ' + (b.playerJudged > 0 ? (pPct + '%') : '--%');
+    document.getElementById('j-rival-rhythm').textContent = 'RIVAL ' + (b.rivalJudged > 0 ? (rPct + '%') : '--%');
+    document.getElementById('j-player-pts').textContent = b.playerScore;
+    document.getElementById('j-rival-pts').textContent = b.rivalScore;
+    document.getElementById('j-bar-p').style.width = pPct + '%';
+    document.getElementById('j-bar-r').style.width = rPct + '%';
+
+    document.getElementById('flow-fill').style.width = Math.round(b.flow) + '%';
+    const odBtn = document.getElementById('btn-overdrive');
+    if (b.overdriveTime > 0) {
+      odBtn.textContent = '✨ x2 (' + Math.ceil(b.overdriveTime) + 's)';
+      odBtn.classList.add('ready');
+    } else if (b.flow >= 100) {
+      odBtn.textContent = '✨ ¡ACTIVAR GALA!';
+      odBtn.classList.add('ready');
+    } else {
+      odBtn.textContent = '✨ GALA ' + Math.round(b.flow) + '%';
+      odBtn.classList.remove('ready');
+    }
+  }
+
+  function drawRhythmTrack() {
+    const b = state.battle;
+    if (!b || b.phase !== 'player') return;
+    const w = rhythmCanvas.width;
+    const h = rhythmCanvas.height;
+    rCtx.clearRect(0, 0, w, h);
+
+    const cx = w / 2;
+    const cy = h / 2;
+    const lookAhead = 2.35;
+
+    // Guía central horizontal de pulso BPM
+    rCtx.strokeStyle = 'rgba(250, 204, 21, 0.22)';
+    rCtx.lineWidth = 2;
+    rCtx.beginPath();
+    rCtx.moveTo(16, cy);
+    rCtx.lineTo(w - 16, cy);
+    rCtx.stroke();
+
+    // Zona central de acierto perfecto (ZONA RITMO)
+    rCtx.fillStyle = 'rgba(250, 204, 21, 0.14)';
+    rCtx.beginPath();
+    rCtx.arc(cx, cy, 24, 0, Math.PI * 2);
+    rCtx.fill();
+
+    rCtx.strokeStyle = b.overdriveTime > 0 ? '#facc15' : '#34d399';
+    rCtx.lineWidth = 3;
+    rCtx.beginPath();
+    rCtx.arc(cx, cy, 19, 0, Math.PI * 2);
+    rCtx.stroke();
+
+    rCtx.fillStyle = 'rgba(255,255,255,0.65)';
+    rCtx.font = '800 9px Inter, sans-serif';
+    rCtx.textAlign = 'center';
+    rCtx.textBaseline = 'middle';
+    rCtx.fillText('PULSO', cx, cy);
+
+    // Pista limpia sin textos informativos
+
+    // Pulsos convergentes desde izquierda y derecha hacia el centro
+    for (let i = 0; i < b.playerBeats.length; i++) {
+      const beat = b.playerBeats[i];
+      if (beat.hit || beat.missed) continue;
+      const dt = beat.time - b.phaseElapsed;
+      if (dt < -0.25 || dt > lookAhead) continue;
+      const frac = dt / lookAhead; // 1 = borde, 0 = centro
+      const offset = frac * (cx - 22);
+      const col = (i % 2 === 0) ? '#34d399' : '#facc15';
+
+      [-1, 1].forEach((side) => {
+        const px = cx + side * offset;
+        rCtx.fillStyle = col;
+        rCtx.beginPath();
+        rCtx.arc(px, cy, 10, 0, Math.PI * 2);
+        rCtx.fill();
+        rCtx.strokeStyle = '#05120c';
+        rCtx.lineWidth = 2;
+        rCtx.stroke();
+      });
+    }
+  }
+
+  function finishBattle() {
+    audio.stopBeat();
+    const b = state.battle;
+    const stage = b.stage;
+    const { pPct, rPct } = getRhythmMetrics(b);
+
+    // La consola elige al vencedor por el mejor ritmo (con desempate por puntaje de pasarela)
+    const won = (pPct > rPct) || (pPct === rPct && b.playerScore >= b.rivalScore);
+    const rank = !won ? 'C' : (pPct >= 88 && b.playerStepsUsed.size >= 5 ? 'S' : (pPct >= 75 ? 'A' : 'B'));
+
+    state.mode = 'result';
+    document.getElementById('battle-ui').classList.remove('active');
+    document.getElementById('btn-exit-battle').style.display = 'none';
+
+    let isGrandFinale = false;
+    if (won) {
+      state.totalScore += b.playerScore;
+      state.cleared[stage.id] = true;
+      state.bestRanks[stage.id] = rank;
+      if (state.level === stage.levelReq && state.level < STAGES.length) {
+        state.level++;
+      }
+      audio.sfxLevelUp();
+      isGrandFinale = state.cleared.every(Boolean);
+    }
+
+    document.getElementById('res-rank-badge').textContent = rank;
+    document.getElementById('res-player-rhythm').textContent = pPct + '%';
+    document.getElementById('res-rival-rhythm').textContent = rPct + '%';
+    document.getElementById('res-score').textContent = b.playerScore + ' (' + b.maxCombo + 'x)';
+    document.getElementById('res-variety').textContent = b.playerStepsUsed.size + '/12 pasos';
+
+    const btnP = document.getElementById('btn-res-primary');
+    const btnS = document.getElementById('btn-res-secondary');
+
+    if (isGrandFinale) {
+      document.getElementById('res-kicker').textContent = '👑 VEREDICTO FINAL • CIRCUITO CONQUISTADO';
+      document.getElementById('res-title').textContent = '¡REINA DEL RITMO Y ALTA MODA!';
+      document.getElementById('res-desc').textContent = 'Venciste en ritmo a las 5 modelos desde la Plaza 24 hasta el Cambódromo. Total acumulado: ' + state.totalScore + ' pts.';
+      btnP.textContent = 'NUEVO CIRCUITO DESDE NIVEL 1 🔄';
+      btnP.onclick = resetFullCircuit;
+      btnS.textContent = 'PASEAR POR SANTA CRUZ';
+      btnS.onclick = returnToMap;
+    } else if (won) {
+      const nextSt = STAGES.find((s) => !state.cleared[s.id]);
+      document.getElementById('res-kicker').textContent = 'CONSOLA: MEJOR RITMO (' + pPct + '% VS ' + rPct + '%)';
+      document.getElementById('res-title').textContent = '¡GANASTE LA PASARELA!';
+      document.getElementById('res-desc').textContent = nextSt
+        ? 'Superaste a ' + stage.rival + ' en ritmo. Se abrió la Puerta ' + (nextSt.id + 1) + ' (' + nextSt.name + ').'
+        : 'Pasarela ganada con excelente ritmo y variedad.';
+      btnP.textContent = 'VOLVER A SANTA CRUZ 🗺️';
+      btnP.onclick = returnToMap;
+      btnS.textContent = 'REPETIR ESTA PASARELA';
+      btnS.onclick = () => {
+        document.getElementById('result-modal').classList.add('hidden');
+        startBattle(stage);
+      };
+    } else {
+      document.getElementById('res-kicker').textContent = 'CONSOLA: RITMO RIVAL SUPERIOR (' + rPct + '% VS ' + pPct + '%)';
+      document.getElementById('res-title').textContent = stage.rival + ' GANÓ POR RITMO';
+      document.getElementById('res-desc').textContent = 'Ejecuta distintos pasos de la consola justo cuando los pulsos llegan al centro para superar su ' + rPct + '%.';
+      btnP.textContent = 'REINTENTAR PASARELA ✨';
+      btnP.onclick = () => {
+        document.getElementById('result-modal').classList.add('hidden');
+        startBattle(stage);
+      };
+      btnS.textContent = 'VOLVER A SANTA CRUZ';
+      btnS.onclick = returnToMap;
+    }
+
+    recordBattleToDB({
+      user: currentUser || 'Invitado',
+      stageName: stage.name,
+      rival: stage.rival,
+      playerRhythmPct: pPct,
+      rivalRhythmPct: rPct,
+      playerScore: b.playerScore,
+      rivalScore: b.rivalScore,
+      stepsVariety: b.playerStepsUsed.size,
+      won,
+      rank,
+      timestamp: Date.now()
+    });
+    saveGameProgressToDB();
+
+    updateGlobalHUD();
+    document.getElementById('result-modal').classList.remove('hidden');
+  }
+
+  function returnToMap() {
+    audio.stopBeat();
+    document.getElementById('result-modal').classList.add('hidden');
+    document.getElementById('battle-ui').classList.remove('active');
+    document.getElementById('btn-exit-battle').style.display = 'none';
+    document.getElementById('radar-box').style.display = 'block';
+    state.mode = 'map';
+    state.battle = null;
+    buildSantaCruzUrbanMap();
+    updateGlobalHUD();
+    updateMapHUDVisibility();
+  }
+
+  function resetFullCircuit() {
+    state.level = 1;
+    state.cleared = [false, false, false, false, false];
+    state.bestRanks = ['', '', '', '', ''];
+    state.totalScore = 0;
+    state.playerPos = { x: 0, z: 10 };
+    state.playerYaw = Math.PI;
+    saveGameProgressToDB();
+    returnToMap();
+  }
+
+  function cyclePlayerOutfit() {
+    state.outfitIndex = (state.outfitIndex + 1) % PLAYER_OUTFITS.length;
+    document.querySelectorAll('.couture-opt').forEach((b, i) => b.classList.toggle('active', i === state.outfitIndex));
+    saveGameProgressToDB();
+    if (state.mode === 'map' || state.mode === 'title') {
+      buildSantaCruzUrbanMap();
+    } else if (state.mode === 'battle' && state.battle) {
+      buildBattleArena(state.battle.stage);
+      document.getElementById('b-player-name').textContent = PLAYER_OUTFITS[state.outfitIndex].name;
+    }
+  }
+
+  // =========================================================================
+  // 10. HUD & MINI-RADAR CRUCEÑO
+  // =========================================================================
+  function getNextTargetStage() {
+    return STAGES.find((s) => !state.cleared[s.id]) || STAGES[STAGES.length - 1];
+  }
+
+  function updateGlobalHUD() {
+    const clearedCount = state.cleared.filter(Boolean).length;
+    document.getElementById('hud-level').textContent = state.level;
+    document.getElementById('hud-rank-title').textContent = RANK_TITLES[Math.min(state.level - 1, RANK_TITLES.length - 1)];
+    document.getElementById('hud-xp-fill').style.width = ((clearedCount / STAGES.length) * 100) + '%';
+    document.getElementById('hud-doors-cleared').textContent = clearedCount + '/5';
+    document.getElementById('hud-total-score').textContent = state.totalScore + ' pts';
+
+    const nextSt = getNextTargetStage();
+    const autoBtn = document.getElementById('btn-autowalk');
+    autoBtn.textContent = state.autoWalk ? '⏹️ Detener' : ('🧭 Puerta ' + (nextSt.id + 1));
+    autoBtn.classList.toggle('active', state.autoWalk);
+  }
+
+  function updateMapHUDVisibility() {
+    const isMap = state.mode === 'map';
+    document.getElementById('map-controls').style.display = isMap ? 'flex' : 'none';
+    if (!isMap) document.getElementById('door-prompt').classList.remove('visible');
+  }
+
+  function drawMiniRadar() {
+    if (state.mode !== 'map') return;
+    const size = 92;
+    const half = size / 2;
+    const scale = 1.08;
+    mCtx.clearRect(0, 0, size, size);
+
+    mCtx.fillStyle = 'rgba(255,255,255,0.09)';
+    mCtx.fillRect(half - 6, 4, 12, size - 8);
+    mCtx.fillRect(4, half - 6, size - 8, 12);
+
+    mCtx.strokeStyle = 'rgba(52,211,153,0.48)';
+    mCtx.lineWidth = 1.6;
+    mCtx.beginPath(); mCtx.arc(half, half, 14, 0, Math.PI * 2); mCtx.stroke();
+
+    STAGES.forEach((st) => {
+      const rx = half + st.doorPos.x * scale;
+      const ry = half + st.doorPos.z * scale;
+      const unlocked = state.level >= st.levelReq;
+      const cleared = state.cleared[st.id];
+      mCtx.fillStyle = cleared ? '#34d399' : (unlocked ? st.accentHex : '#ef4444');
+      mCtx.beginPath(); mCtx.arc(rx, ry, unlocked && !cleared ? 5.5 : 4, 0, Math.PI * 2); mCtx.fill();
+      if (unlocked && !cleared) {
+        mCtx.strokeStyle = '#ffffff'; mCtx.lineWidth = 1.5; mCtx.stroke();
+      }
+    });
+
+    const px = half + state.playerPos.x * scale;
+    const py = half + state.playerPos.z * scale;
+    mCtx.fillStyle = '#ffffff';
+    mCtx.beginPath(); mCtx.arc(px, py, 4.2, 0, Math.PI * 2); mCtx.fill();
+    mCtx.strokeStyle = '#facc15'; mCtx.lineWidth = 2; mCtx.stroke();
+  }
+
+  // =========================================================================
+  // 11. CONTROLES (JOYSTICK TÁCTIL, TECLADO, SELECTOR ALTA MODA, PADS)
+  // =========================================================================
+  const joyZone = document.getElementById('joystick-zone');
+  const joyKnob = document.getElementById('joystick-knob');
+  let joyActive = false;
+  let joyCenter = { x: 0, y: 0 };
+
+  function updateJoystick(clientX, clientY) {
+    const dx = clientX - joyCenter.x;
+    const dy = clientY - joyCenter.y;
+    const maxR = 38;
+    const dist = Math.hypot(dx, dy);
+    const clamped = Math.min(dist, maxR);
+    const ang = Math.atan2(dy, dx);
+    const kx = Math.cos(ang) * clamped;
+    const ky = Math.sin(ang) * clamped;
+    joyKnob.style.left = (37 + kx) + 'px';
+    joyKnob.style.top = (37 + ky) + 'px';
+    state.inputVec.x = kx / maxR;
+    state.inputVec.z = ky / maxR;
+    if (dist > 6 && state.autoWalk) {
+      state.autoWalk = false;
+      updateGlobalHUD();
+    }
+  }
+
+  function resetJoystick() {
+    joyActive = false;
+    joyKnob.style.left = '37px';
+    joyKnob.style.top = '37px';
+    state.inputVec.x = 0;
+    state.inputVec.z = 0;
+  }
+
+  joyZone.addEventListener('pointerdown', (e) => {
+    audio.init();
+    const r = joyZone.getBoundingClientRect();
+    joyCenter = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    joyActive = true;
+    joyZone.setPointerCapture(e.pointerId);
+    updateJoystick(e.clientX, e.clientY);
+  });
+  joyZone.addEventListener('pointermove', (e) => { if (joyActive) updateJoystick(e.clientX, e.clientY); });
+  joyZone.addEventListener('pointerup', resetJoystick);
+  joyZone.addEventListener('pointercancel', resetJoystick);
+
+  window.addEventListener('keydown', (e) => {
+    const k = e.key.toLowerCase();
+    state.keys[k] = true;
+    if (state.mode === 'map' && (k === 'e' || k === 'enter') && state.nearbyDoor && state.level >= state.nearbyDoor.levelReq) {
+      startBattle(state.nearbyDoor);
+    } else if (state.mode === 'battle') {
+      const keyMap = { 'a': 0, '1': 0, 's': 1, '2': 1, 'w': 2, '3': 2, 'd': 3, '4': 3, 'q': 4, '5': 4, 'e': 5, '6': 5, 'r': 6, '7': 6, 'f': 7, '8': 7, 'z': 8, '9': 8, 'x': 9, '0': 9, 'c': 10, '-': 10, 'v': 11, '=': 11 };
+      if (keyMap[k] !== undefined) handleStepTrigger(keyMap[k]);
+      else if (k === ' ') { e.preventDefault(); triggerOverdrive(); }
+    }
+  });
+  window.addEventListener('keyup', (e) => { state.keys[e.key.toLowerCase()] = false; });
+
+  document.getElementById('btn-skip-rival').addEventListener('click', beginTurnTransition);
+
+  document.querySelectorAll('.couture-opt').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.outfitIndex = parseInt(btn.getAttribute('data-outfit'), 10) || 0;
+      document.querySelectorAll('.couture-opt').forEach((b, i) => b.classList.toggle('active', i === state.outfitIndex));
+      buildSantaCruzUrbanMap();
+    });
+  });
+
+  document.getElementById('btn-outfit').addEventListener('click', cyclePlayerOutfit);
+  document.getElementById('btn-overdrive').addEventListener('click', triggerOverdrive);
+
+  function updateSessionHUD() {
+    const btnAdm = document.getElementById('btn-admin-panel');
+    const btnOut = document.getElementById('btn-logout');
+    const dock = document.getElementById('admin-dock');
+    const isAdminOrMod = (currentUserRole === 'admin' || currentUserRole === 'subadmin');
+    if (btnAdm) {
+      btnAdm.style.display = 'inline-flex';
+      btnAdm.textContent = isAdminOrMod ? '👑 Admin' : '🔑 Admin';
+    }
+    if (dock) dock.classList.toggle('visible', isAdminOrMod);
+    if (btnOut) btnOut.style.display = currentUser ? 'inline-flex' : 'none';
+  }
+
+  async function openAdminModalTab(tabId) {
+    const isAdminOrMod = (currentUserRole === 'admin' || currentUserRole === 'subadmin');
+    if (!isAdminOrMod) {
+      // Si entró como invitado/jugadora, abrir pantalla de acceso Admin
+      document.getElementById('start-modal').classList.remove('hidden');
+      return;
+    }
+    await loadUsersFromDB();
+    document.getElementById('adm-fb-apikey').value = EXTERNAL_DB_CONFIG.apiKey || '';
+    document.getElementById('adm-fb-projectid').value = EXTERNAL_DB_CONFIG.projectId || '';
+    document.getElementById('adm-fb-dburl').value = EXTERNAL_DB_CONFIG.databaseURL || '';
+    document.getElementById('adm-db-namespace').value = DB_NAMESPACE;
+    renderAdminUsers();
+    renderAdminHistory();
+    renderAdminSecurityLogs();
+    const targetTab = tabId || 'users';
+    document.querySelectorAll('.admin-tab').forEach((t) => t.classList.toggle('active', t.getAttribute('data-tab') === targetTab));
+    document.querySelectorAll('.admin-pane').forEach((p) => p.classList.toggle('active', p.id === 'admin-pane-' + targetTab));
+    adminModal.classList.remove('hidden');
+  }
+
+  async function enterGameSession(user, role) {
+    currentUser = user;
+    currentUserRole = role;
+    if (role !== 'guest') {
+      await loadGameProgressFromDB(user);
+    }
+    updateSessionHUD();
+    document.getElementById('start-modal').classList.add('hidden');
+    state.mode = 'map';
+    buildSantaCruzUrbanMap();
+    updateGlobalHUD();
+    updateMapHUDVisibility();
+    loadSharedMusicFromDB();
+  }
+
+  async function performLogin() {
+    audio.init();
+    const msgEl = document.getElementById('login-msg');
+    msgEl.style.color = '#fda4af';
+
+    if (Date.now() < loginLockUntil) {
+      const secs = Math.ceil((loginLockUntil - Date.now()) / 1000);
+      msgEl.textContent = 'Demasiados intentos fallidos. Espera ' + secs + 's.';
+      return;
+    }
+
+    let u = (document.getElementById('login-username').value || '').trim();
+    const p = (document.getElementById('login-password').value || '').trim();
+    if (!u) { msgEl.textContent = 'Ingresa tu usuario (@nombre) o cuenta Admin.'; return; }
+    if (p.length < 6) { msgEl.textContent = 'La contraseña debe tener al menos 6 caracteres.'; return; }
+    if (!u.startsWith('@') && !u.includes('@')) u = '@' + u;
+
+    if (!usersDB.length) await loadUsersFromDB();
+
+    let acc = usersDB.find((x) => x && x.name && x.name.toLowerCase() === u.toLowerCase());
+
+    if (acc) {
+      const computedHash = await hashPassword(p, acc.salt || '');
+      const hashMatches = (computedHash === acc.passHash) || (acc.mustChangePassword && acc.fallbackHash && computedHash === acc.fallbackHash);
+      if (!hashMatches) {
+        failedLoginCount++;
+        await logSecurityEvent('LOGIN_FAILED', u, 'Contraseña incorrecta (intento ' + failedLoginCount + ')');
+        if (failedLoginCount >= 5) {
+          loginLockUntil = Date.now() + 30000;
+          failedLoginCount = 0;
+          msgEl.textContent = 'Bloqueo temporal de 30s por seguridad.';
+        } else {
+          msgEl.textContent = 'Credenciales incorrectas. Intenta nuevamente.';
+        }
+        return;
+      }
+      if (!acc.hasGameAccess && acc.role !== 'admin') {
+        msgEl.textContent = 'Acceso restringido por administración.';
+        return;
+      }
+      failedLoginCount = 0;
+      document.getElementById('login-password').value = '';
+      msgEl.textContent = '';
+
+      // Si es el primer arranque del Admin con clave inicial, exigir cambio obligatorio antes de entrar
+      if (acc.mustChangePassword) {
+        pendingForcePassUser = acc;
+        document.getElementById('start-modal').classList.add('hidden');
+        document.getElementById('fp-new-pass').value = '';
+        document.getElementById('fp-confirm-pass').value = '';
+        document.getElementById('fp-msg').textContent = '';
+        document.getElementById('force-pass-modal').classList.remove('hidden');
+        return;
+      }
+
+      acc.lastLoginAt = Date.now();
+      await saveUsersToDB();
+      await logSecurityEvent('LOGIN_OK', acc.name, 'Ingreso verificado (' + acc.role + ')');
+    } else {
+      const salt = generateSalt();
+      const passHash = await hashPassword(p, salt);
+      acc = {
+        name: u,
+        alias: safeDisplayAlias(u),
+        salt,
+        passHash,
+        role: 'player',
+        hasGameAccess: true,
+        canCreateSubAdmins: false,
+        mustChangePassword: false,
+        createdAt: Date.now(),
+        lastLoginAt: Date.now()
+      };
+      usersDB.push(acc);
+      await saveUsersToDB();
+      await logSecurityEvent('USER_REGISTER', acc.name, 'Cuenta creada con hash SHA-256');
+    }
+
+    const remember = document.getElementById('chk-remember-session');
+    if (!remember || remember.checked) {
+      try { localStorage.setItem('ubc_saved_session', JSON.stringify({ name: acc.name })); } catch (e) {}
+    }
+    msgEl.textContent = '';
+    document.getElementById('login-password').value = '';
+    await enterGameSession(acc.name, acc.role);
+  }
+
+  document.getElementById('btn-start-game').addEventListener('click', performLogin);
+  document.getElementById('login-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') performLogin();
+  });
+
+  async function saveForcedAdminPassword() {
+    if (!pendingForcePassUser) return;
+    const fpMsg = document.getElementById('fp-msg');
+    const np = (document.getElementById('fp-new-pass').value || '').trim();
+    const cp = (document.getElementById('fp-confirm-pass').value || '').trim();
+
+    if (np.length < 8) {
+      fpMsg.textContent = 'La nueva contraseña debe tener al menos 8 caracteres.';
+      return;
+    }
+    if (np !== cp) {
+      fpMsg.textContent = 'Las contraseñas no coinciden.';
+      return;
+    }
+    // Verificar que no reutilice la clave inicial
+    const checkBoot = await hashPassword(np, BOOTSTRAP_SALT);
+    if (checkBoot === BOOTSTRAP_SHA256 || checkBoot === BOOTSTRAP_FALLBACK) {
+      fpMsg.textContent = 'Debes elegir una contraseña diferente a la inicial.';
+      return;
+    }
+
+    const newSalt = generateSalt();
+    pendingForcePassUser.salt = newSalt;
+    pendingForcePassUser.passHash = await hashPassword(np, newSalt);
+    delete pendingForcePassUser.fallbackHash;
+    pendingForcePassUser.mustChangePassword = false;
+    pendingForcePassUser.lastLoginAt = Date.now();
+
+    await saveUsersToDB();
+    await logSecurityEvent('ADMIN_PASS_ROTATED', pendingForcePassUser.name, 'Clave inicial revocada y reemplazada con SHA-256');
+
+    const remember = document.getElementById('chk-remember-session');
+    if (!remember || remember.checked) {
+      try { localStorage.setItem('ubc_saved_session', JSON.stringify({ name: pendingForcePassUser.name })); } catch (e) {}
+    }
+
+    const acc = pendingForcePassUser;
+    pendingForcePassUser = null;
+    document.getElementById('fp-new-pass').value = '';
+    document.getElementById('fp-confirm-pass').value = '';
+    document.getElementById('force-pass-modal').classList.add('hidden');
+    await enterGameSession(acc.name, acc.role);
+  }
+
+  document.getElementById('btn-save-force-pass').addEventListener('click', saveForcedAdminPassword);
+  document.getElementById('fp-confirm-pass').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') saveForcedAdminPassword();
+  });
+
+  document.getElementById('btn-guest-login').addEventListener('click', () => {
+    audio.init();
+    enterGameSession('Invitado', 'guest');
+  });
+
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    audio.stopBeat();
+    try { localStorage.removeItem('ubc_saved_session'); } catch (e) {}
+    logSecurityEvent('LOGOUT', currentUser, 'Sesión cerrada');
+    currentUser = '';
+    currentUserRole = 'guest';
+    state.mode = 'title';
+    document.getElementById('battle-ui').classList.remove('active');
+    document.getElementById('btn-exit-battle').style.display = 'none';
+    document.getElementById('radar-box').style.display = 'block';
+    updateSessionHUD();
+    updateMapHUDVisibility();
+    updateLoginModeHint();
+    document.getElementById('start-modal').classList.remove('hidden');
+  });
+
+  // PANEL DE ADMINISTRACIÓN (XSS-SAFE DOM + SHA-256 + AUDITORÍA)
+  const adminModal = document.getElementById('admin-modal');
+  function renderAdminUsers() {
+    const listEl = document.getElementById('adm-users-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const me = usersDB.find((u) => u.name.toLowerCase() === currentUser.toLowerCase());
+    const canSub = currentUserRole === 'admin' || (me && me.canCreateSubAdmins);
+    const optSub = document.getElementById('adm-opt-subadmin');
+    if (optSub) { optSub.hidden = !canSub; optSub.disabled = !canSub; }
+
+    const weight = { admin: 1, subadmin: 2, player: 3 };
+    const sorted = [...usersDB].sort((a, b) => (weight[a.role] || 9) - (weight[b.role] || 9));
+    sorted.forEach((u) => {
+      if (u.role === 'admin' && currentUserRole !== 'admin') return;
+      const card = document.createElement('div');
+      card.className = 'admin-card' + (u.hasGameAccess ? '' : ' banned');
+      const roleTxt = u.role === 'admin' ? '👑 Admin' : (u.role === 'subadmin' ? '🎧 Mod' : '💃 Jugadora');
+      const canEdit = currentUserRole === 'admin' || (currentUserRole === 'subadmin' && u.role === 'player');
+
+      const top = document.createElement('div');
+      top.className = 'admin-card-top';
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = safeDisplayAlias(u.name);
+      const roleSpan = document.createElement('span');
+      roleSpan.style.cssText = 'color:var(--gold); font-size:10px;';
+      roleSpan.textContent = roleTxt;
+      top.appendChild(nameSpan);
+      top.appendChild(roleSpan);
+      card.appendChild(top);
+
+      const act = document.createElement('div');
+      act.className = 'admin-card-actions';
+
+      const passInp = document.createElement('input');
+      passInp.type = 'password';
+      passInp.className = 'mini-input';
+      passInp.value = '';
+      passInp.placeholder = 'Nueva clave (mín. 6)';
+      passInp.disabled = !canEdit;
+      passInp.addEventListener('change', async () => {
+        const np = passInp.value.trim();
+        if (np.length < 6) {
+          document.getElementById('adm-users-msg').textContent = 'La nueva clave debe tener al menos 6 caracteres.';
+          return;
+        }
+        u.salt = generateSalt();
+        u.passHash = await hashPassword(np, u.salt);
+        passInp.value = '';
+        await saveUsersToDB();
+        await logSecurityEvent('PASS_RESET', currentUser, 'Clave actualizada (SHA-256) para ' + safeDisplayAlias(u.name));
+        document.getElementById('adm-users-msg').textContent = 'Clave actualizada con SHA-256 para ' + safeDisplayAlias(u.name);
+      });
+      act.appendChild(passInp);
+
+      if (currentUserRole === 'admin' && u.role !== 'admin') {
+        const banBtn = document.createElement('button');
+        banBtn.className = 'mini-btn ' + (u.hasGameAccess ? '' : 'danger');
+        banBtn.textContent = u.hasGameAccess ? 'Acceso: 🔓' : 'Acceso: 🔒';
+        banBtn.addEventListener('click', async () => {
+          u.hasGameAccess = !u.hasGameAccess;
+          await saveUsersToDB();
+          await logSecurityEvent('ACCESS_TOGGLE', currentUser, safeDisplayAlias(u.name) + ' -> ' + (u.hasGameAccess ? 'habilitado' : 'restringido'));
+          renderAdminUsers();
+        });
+        act.appendChild(banBtn);
+      }
+      if (currentUserRole === 'admin' && u.role === 'subadmin') {
+        const subBtn = document.createElement('button');
+        subBtn.className = 'mini-btn warn';
+        subBtn.textContent = u.canCreateSubAdmins ? 'Crear Mods: SÍ' : 'Crear Mods: NO';
+        subBtn.addEventListener('click', async () => {
+          u.canCreateSubAdmins = !u.canCreateSubAdmins;
+          await saveUsersToDB();
+          await logSecurityEvent('PERM_UPDATE', currentUser, 'Permiso Mods actualizado para ' + safeDisplayAlias(u.name));
+          renderAdminUsers();
+        });
+        act.appendChild(subBtn);
+      }
+
+      card.appendChild(act);
+      listEl.appendChild(card);
+    });
+  }
+
+  async function renderAdminHistory() {
+    await loadBattleHistoryFromDB();
+    const listEl = document.getElementById('adm-history-list');
+    const sumEl = document.getElementById('adm-history-summary');
+    const top10El = document.getElementById('adm-top10-box');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    if (top10El) top10El.innerHTML = '';
+    sumEl.textContent = 'Registros reales guardados en DB: ' + battleHistoryDB.length + ' pasarelas.';
+    if (!battleHistoryDB.length) {
+      const empty = document.createElement('div');
+      empty.className = 'admin-card';
+      empty.style.cssText = 'font-size:11px; color:var(--muted);';
+      empty.textContent = 'Aún no hay pasarelas completadas registradas.';
+      listEl.appendChild(empty);
+      return;
+    }
+
+    // Construir Top 10 Global por mejor ritmo promedio y puntaje total (XSS-safe)
+    if (top10El) {
+      const byPlayer = new Map();
+      battleHistoryDB.forEach((h) => {
+        const key = safeDisplayAlias(h.user || 'Invitado');
+        const cur = byPlayer.get(key) || { name: key, score: 0, rSum: 0, count: 0, wins: 0 };
+        cur.score += Number(h.playerScore || 0);
+        cur.rSum += Number(h.playerRhythmPct || 0);
+        cur.count += 1;
+        if (h.won) cur.wins += 1;
+        byPlayer.set(key, cur);
+      });
+      const ranked = Array.from(byPlayer.values())
+        .map((p) => ({ name: p.name, avgRhythm: Math.round(p.rSum / Math.max(1, p.count)), score: p.score, wins: p.wins }))
+        .sort((a, b) => (b.avgRhythm - a.avgRhythm) || (b.score - a.score))
+        .slice(0, 10);
+
+      const box = document.createElement('div');
+      box.className = 'admin-card';
+      box.style.borderColor = 'rgba(250, 204, 21, 0.45)';
+      const title = document.createElement('div');
+      title.style.cssText = 'font-size:11px; font-weight:900; color:var(--gold); margin-bottom:4px;';
+      title.textContent = '🏆 TOP 10 GLOBAL DE PASARELA';
+      box.appendChild(title);
+
+      ranked.forEach((row, idx) => {
+        const line = document.createElement('div');
+        line.style.cssText = 'display:flex; justify-content:space-between; font-size:10.5px; padding:2px 0; border-top:1px solid rgba(255,255,255,0.06);';
+        const l = document.createElement('span');
+        l.textContent = '#' + (idx + 1) + ' ' + row.name + ' (' + row.wins + 'W)';
+        const r = document.createElement('span');
+        r.style.color = '#34d399';
+        r.textContent = row.avgRhythm + '% • ' + row.score + ' pts';
+        line.appendChild(l);
+        line.appendChild(r);
+        box.appendChild(line);
+      });
+      top10El.appendChild(box);
+    }
+
+    battleHistoryDB.forEach((h) => {
+      const card = document.createElement('div');
+      card.className = 'admin-card';
+      const top = document.createElement('div');
+      top.className = 'admin-card-top';
+      const leftT = document.createElement('span');
+      leftT.textContent = safeDisplayAlias(h.user) + ' • ' + String(h.stageName || '');
+      const rightT = document.createElement('span');
+      rightT.style.color = h.won ? '#34d399' : '#fda4af';
+      rightT.textContent = (h.won ? '🏆 GANÓ' : 'VIRTUAL') + ' (' + String(h.rank || '-') + ')';
+      top.appendChild(leftT);
+      top.appendChild(rightT);
+
+      const sub = document.createElement('div');
+      sub.style.cssText = 'font-size:10.5px; color:var(--muted);';
+      const dtStr = h.timestamp ? new Date(h.timestamp).toLocaleString() : '';
+      sub.textContent = 'Ritmo: ' + Number(h.playerRhythmPct || 0) + '% vs ' + Number(h.rivalRhythmPct || 0) + '% • ' + Number(h.playerScore || 0) + ' pts • ' + Number(h.stepsVariety || 0) + '/12 pasos • ' + dtStr;
+
+      card.appendChild(top);
+      card.appendChild(sub);
+      listEl.appendChild(card);
+    });
+  }
+
+  async function renderAdminSecurityLogs() {
+    await loadSecurityLogsFromDB();
+    const listEl = document.getElementById('adm-sec-list');
+    const sumEl = document.getElementById('adm-sec-summary');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    sumEl.textContent = 'Auditoría de seguridad (SHA-256 activo): ' + securityLogsDB.length + ' eventos verificados.';
+    if (!securityLogsDB.length) {
+      const empty = document.createElement('div');
+      empty.className = 'admin-card';
+      empty.style.cssText = 'font-size:11px; color:var(--muted);';
+      empty.textContent = 'Sin eventos de seguridad registrados aún.';
+      listEl.appendChild(empty);
+      return;
+    }
+    securityLogsDB.forEach((ev) => {
+      const card = document.createElement('div');
+      card.className = 'admin-card';
+      const top = document.createElement('div');
+      top.className = 'admin-card-top';
+      const left = document.createElement('span');
+      left.textContent = String(ev.event) + ' • ' + safeDisplayAlias(ev.actor);
+      const right = document.createElement('span');
+      right.style.cssText = 'font-size:9.5px; color:var(--muted);';
+      right.textContent = ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : '';
+      top.appendChild(left);
+      top.appendChild(right);
+      const det = document.createElement('div');
+      det.style.cssText = 'font-size:10.5px; color:var(--cream);';
+      det.textContent = String(ev.details || '');
+      card.appendChild(top);
+      card.appendChild(det);
+      listEl.appendChild(card);
+    });
+  }
+
+  document.getElementById('btn-admin-panel').addEventListener('click', () => openAdminModalTab('users'));
+  document.querySelectorAll('.adm-dock-btn').forEach((btn) => {
+    btn.addEventListener('click', () => openAdminModalTab(btn.getAttribute('data-open-tab')));
+  });
+
+  document.getElementById('btn-close-admin').addEventListener('click', () => {
+    adminModal.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.admin-tab').forEach((tab) => {
+    tab.addEventListener('click', () => {
+      const id = tab.getAttribute('data-tab');
+      document.querySelectorAll('.admin-tab').forEach((t) => t.classList.toggle('active', t === tab));
+      document.querySelectorAll('.admin-pane').forEach((p) => p.classList.toggle('active', p.id === 'admin-pane-' + id));
+      if (id === 'history') renderAdminHistory();
+      if (id === 'security') renderAdminSecurityLogs();
+    });
+  });
+
+  document.getElementById('btn-adm-create-user').addEventListener('click', async () => {
+    let name = (document.getElementById('adm-new-user').value || '').trim();
+    const pass = (document.getElementById('adm-new-pass').value || '').trim();
+    const role = document.getElementById('adm-new-role').value;
+    const msg = document.getElementById('adm-users-msg');
+    if (!name || pass.length < 6) { msg.textContent = 'Ingresa usuario y una contraseña de al menos 6 caracteres.'; return; }
+    if (!name.startsWith('@') && !name.includes('@')) name = '@' + name;
+    if (usersDB.find((u) => u.name.toLowerCase() === name.toLowerCase())) {
+      msg.textContent = 'Ese usuario ya existe en la base de datos.'; return;
+    }
+    const salt = generateSalt();
+    const passHash = await hashPassword(pass, salt);
+    usersDB.push({
+      name, alias: safeDisplayAlias(name), salt, passHash, role,
+      hasGameAccess: true, canCreateSubAdmins: false,
+      createdAt: Date.now()
+    });
+    await saveUsersToDB();
+    await logSecurityEvent('USER_CREATED', currentUser, 'Creó cuenta ' + safeDisplayAlias(name) + ' (' + role + ')');
+    document.getElementById('adm-new-user').value = '';
+    document.getElementById('adm-new-pass').value = '';
+    msg.textContent = 'Cuenta ' + safeDisplayAlias(name) + ' guardada con SHA-256 en Firebase DB.';
+    renderAdminUsers();
+  });
+
+  document.getElementById('btn-adm-save-ns').addEventListener('click', async () => {
+    const apiKey = (document.getElementById('adm-fb-apikey').value || '').trim();
+    const projectId = (document.getElementById('adm-fb-projectid').value || '').trim();
+    const databaseURL = (document.getElementById('adm-fb-dburl').value || '').trim();
+    const ns = (document.getElementById('adm-db-namespace').value || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    if (ns) {
+      DB_NAMESPACE = ns;
+      try { localStorage.setItem('ubc_db_namespace', DB_NAMESPACE); } catch (e) {}
+    }
+    if (apiKey && databaseURL) {
+      EXTERNAL_DB_CONFIG.apiKey = apiKey;
+      EXTERNAL_DB_CONFIG.projectId = projectId;
+      EXTERNAL_DB_CONFIG.authDomain = projectId ? (projectId + '.firebaseapp.com') : '';
+      EXTERNAL_DB_CONFIG.databaseURL = databaseURL;
+      try { localStorage.setItem('ubc_custom_fb_config', JSON.stringify(EXTERNAL_DB_CONFIG)); } catch (e) {}
+      initExternalFirebase();
+    }
+    await saveUsersToDB();
+    await saveGameProgressToDB();
+    await logSecurityEvent('DB_CONFIG', currentUser, 'Proyecto DB actualizado: ' + (projectId || 'local') + ' /' + DB_NAMESPACE);
+    await loadUsersFromDB();
+    renderAdminUsers();
+    renderAdminHistory();
+    renderAdminSecurityLogs();
+  });
+
+  document.getElementById('btn-adm-sync-now').addEventListener('click', async () => {
+    await loadUsersFromDB();
+    await saveGameProgressToDB();
+    await renderAdminHistory();
+    await renderAdminSecurityLogs();
+    renderAdminUsers();
+  });
+
+  document.getElementById('btn-adm-export-json').addEventListener('click', () => {
+    // Exportar respaldo limpio sin exponer hashes ni salts
+    const safeUsers = usersDB.map((u) => ({
+      alias: u.alias || safeDisplayAlias(u.name),
+      role: u.role,
+      hasGameAccess: u.hasGameAccess,
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt
+    }));
+    const dump = {
+      namespace: DB_NAMESPACE,
+      exportedAt: new Date().toISOString(),
+      users: safeUsers,
+      battles: battleHistoryDB,
+      securityLogs: securityLogsDB
+    };
+    const blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = DB_NAMESPACE + '_respaldo_seguro.json';
+    a.click();
+  });
+
+  document.getElementById('btn-enter-door').addEventListener('click', () => {
+    if (state.nearbyDoor && state.level >= state.nearbyDoor.levelReq) {
+      startBattle(state.nearbyDoor);
+    }
+  });
+
+  document.getElementById('btn-autowalk').addEventListener('click', () => {
+    audio.init();
+    state.autoWalk = !state.autoWalk;
+    updateGlobalHUD();
+  });
+
+  document.getElementById('btn-sound').addEventListener('click', () => {
+    state.soundOn = !state.soundOn;
+    const btn = document.getElementById('btn-sound');
+    btn.textContent = state.soundOn ? '🔊' : '🔇';
+    btn.classList.toggle('active', state.soundOn);
+  });
+
+  document.getElementById('btn-exit-battle').addEventListener('click', returnToMap);
+
+  // Consola de Música Google Drive / MP3 para turnos
+  const musicModal = document.getElementById('music-modal');
+  const driveUrlInput = document.getElementById('drive-url-input');
+  const musicStatusBox = document.getElementById('music-status-box');
+  const musicHudBtn = document.getElementById('btn-music-modal');
+
+  function updateMusicStatusUI(msg, isExternal) {
+    if (musicStatusBox) musicStatusBox.textContent = msg;
+    if (musicHudBtn) musicHudBtn.classList.toggle('active', !!isExternal);
+  }
+
+  // Cargar pista guardada en localStorage si existe
+  try {
+    const savedDriveUrl = localStorage.getItem('ubc_drive_music_url');
+    if (savedDriveUrl) {
+      driveUrlInput.value = savedDriveUrl;
+      const parsed = parseDriveAudioUrl(savedDriveUrl);
+      if (parsed) {
+        audio.setCustomTrack(parsed.primary, parsed.label, parsed.fallback);
+        updateMusicStatusUI('Pista lista (' + parsed.label + '). Sonará al iniciar cada turno.', true);
+      }
+    }
+  } catch (e) {}
+
+  musicHudBtn.addEventListener('click', () => {
+    audio.init();
+    musicModal.classList.remove('hidden');
+  });
+  document.getElementById('btn-close-music').addEventListener('click', () => {
+    musicModal.classList.add('hidden');
+  });
+  document.getElementById('btn-save-drive-audio').addEventListener('click', () => {
+    const raw = driveUrlInput.value.trim();
+    const parsed = parseDriveAudioUrl(raw);
+    if (!parsed) {
+      updateMusicStatusUI('Enlace no válido. Pega un link compartido de Google Drive o carga un MP3 local.', false);
+      return;
+    }
+    audio.setCustomTrack(parsed.primary, parsed.label, parsed.fallback);
+    try { localStorage.setItem('ubc_drive_music_url', raw); } catch (e) {}
+    saveSharedMusicToDB(raw);
+    updateMusicStatusUI('Pista guardada (' + parsed.label + '). Sonará automáticamente al iniciar cada turno.', true);
+  });
+  document.getElementById('local-audio-file').addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const blobUrl = URL.createObjectURL(file);
+    audio.setCustomTrack(blobUrl, file.name, '');
+    updateMusicStatusUI('MP3 local cargado: "' + file.name + '". Sonará al iniciar cada turno.', true);
+  });
+  document.getElementById('btn-test-track').addEventListener('click', () => {
+    audio.init();
+    if (!audio.customSrc) {
+      updateMusicStatusUI('Primero pega un enlace de Drive o carga un archivo MP3.', false);
+      return;
+    }
+    audio.playTurnTrack(null, true);
+    updateMusicStatusUI('Reproduciendo vista previa: ' + audio.customLabel + ' (toca "Usar Synth" o entra a pasarela).', true);
+  });
+  document.getElementById('btn-clear-track').addEventListener('click', () => {
+    audio.setCustomTrack('', '', '');
+    driveUrlInput.value = '';
+    try { localStorage.removeItem('ubc_drive_music_url'); } catch (e) {}
+    saveSharedMusicToDB('');
+    updateMusicStatusUI('Estado: Usando ritmos bolivianos originales (sin pista externa).', false);
+  });
+
+  // Tap Tempo + Control Manual de BPM
+  const bpmSlider = document.getElementById('bpm-slider');
+  const bpmDisplay = document.getElementById('bpm-display');
+  let tapStamps = [];
+  function syncBpmUI() {
+    if (!bpmDisplay) return;
+    if (state.manualBpm) {
+      bpmDisplay.textContent = state.manualBpm + ' BPM (manual)';
+      if (bpmSlider) bpmSlider.value = String(state.manualBpm);
+    } else {
+      bpmDisplay.textContent = 'AUTO (según pasarela)';
+    }
+  }
+  if (bpmSlider) {
+    bpmSlider.addEventListener('input', () => {
+      state.manualBpm = Math.max(72, Math.min(175, parseInt(bpmSlider.value, 10) || 120));
+      syncBpmUI();
+    });
+  }
+  const btnTapTempo = document.getElementById('btn-tap-tempo');
+  if (btnTapTempo) {
+    btnTapTempo.addEventListener('click', () => {
+      const now = performance.now();
+      if (tapStamps.length && now - tapStamps[tapStamps.length - 1] > 2200) tapStamps = [];
+      tapStamps.push(now);
+      if (tapStamps.length > 6) tapStamps.shift();
+      if (tapStamps.length >= 2) {
+        let sum = 0;
+        for (let i = 1; i < tapStamps.length; i++) sum += tapStamps[i] - tapStamps[i - 1];
+        const avgMs = sum / (tapStamps.length - 1);
+        state.manualBpm = Math.max(72, Math.min(175, Math.round(60000 / avgMs)));
+        syncBpmUI();
+      }
+    });
+  }
+  const btnBpmAuto = document.getElementById('btn-bpm-auto');
+  if (btnBpmAuto) {
+    btnBpmAuto.addEventListener('click', () => {
+      state.manualBpm = null;
+      tapStamps = [];
+      syncBpmUI();
+    });
+  }
+
+  // =========================================================================
+  // 12. BUCLE PRINCIPAL DE ANIMACIÓN 60 FPS
+  // =========================================================================
+  let lastTime = performance.now();
+  let animTime = 0;
+
+  function scheduleNextFrame() {
+    if (isSoftwareGl) {
+      setTimeout(() => requestAnimationFrame(animate), 75);
+    } else {
+      requestAnimationFrame(animate);
+    }
+  }
+
+  function animate(now) {
+    scheduleNextFrame();
+    const dt = Math.min((now - lastTime) / 1000, 0.05);
+    lastTime = now;
+    animTime += dt;
+
+    if (mapRefs) {
+      // Brisa tropical cruceña en palmeras y banderas
+      mapRefs.palmCrowns.forEach((cr, i) => {
+        cr.rotation.z = Math.sin(animTime * 1.4 + i) * 0.06;
+      });
+      mapRefs.flags.forEach((fl, i) => {
+        fl.rotation.y = Math.sin(animTime * 3.8 + i) * 0.16;
+      });
+    }
+
+    if (state.mode === 'title' && mapRefs) {
+      camera.position.set(Math.sin(animTime * 0.20) * 24, 12.5, Math.cos(animTime * 0.20) * 24);
+      camera.lookAt(0, 2.2, -4);
+    } else if (state.mode === 'map' && mapRefs) {
+      let mx = state.inputVec.x;
+      let mz = state.inputVec.z;
+      if (state.keys['a'] || state.keys['arrowleft']) mx -= 1;
+      if (state.keys['d'] || state.keys['arrowright']) mx += 1;
+      if (state.keys['w'] || state.keys['arrowup']) mz -= 1;
+      if (state.keys['s'] || state.keys['arrowdown']) mz += 1;
+
+      if (Math.hypot(mx, mz) > 0.1 && state.autoWalk) {
+        state.autoWalk = false;
+        updateGlobalHUD();
+      }
+
+      if (state.autoWalk) {
+        const target = getNextTargetStage().doorPos;
+        const dx = target.x - state.playerPos.x;
+        const dz = target.z - state.playerPos.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist > 3.1) {
+          mx = dx / dist;
+          mz = dz / dist;
+        } else {
+          state.autoWalk = false;
+          updateGlobalHUD();
+        }
+      }
+
+      const len = Math.hypot(mx, mz);
+      const speed = 10.2;
+      if (len > 0.05) {
+        const nx = mx / Math.max(len, 1);
+        const nz = mz / Math.max(len, 1);
+        const nextX = Math.max(-36, Math.min(36, state.playerPos.x + nx * speed * dt));
+        const nextZ = Math.max(-36, Math.min(36, state.playerPos.z + nz * speed * dt));
+
+        let blocked = false;
+        for (let i = 0; i < mapRefs.obstacles.length; i++) {
+          const ob = mapRefs.obstacles[i];
+          if (Math.abs(nextX - ob.x) < ob.hw && Math.abs(nextZ - ob.z) < ob.hd) {
+            blocked = true; break;
+          }
+        }
+        if (!blocked) {
+          state.playerPos.x = nextX;
+          state.playerPos.z = nextZ;
+        }
+        state.playerYaw = Math.atan2(nx, nz);
+      }
+
+      mapRefs.player.root.position.set(state.playerPos.x, 0, state.playerPos.z);
+      mapRefs.player.root.rotation.y = state.playerYaw;
+      animateCatwalkWalk(mapRefs.player, animTime, len > 0.05 ? 1 : 0);
+
+      const nextSt = getNextTargetStage();
+      mapRefs.pointer.position.set(state.playerPos.x, 2.65 + Math.sin(animTime * 5) * 0.12, state.playerPos.z);
+      mapRefs.pointer.lookAt(nextSt.doorPos.x, 2.65, nextSt.doorPos.z);
+
+      let foundDoor = null;
+      mapRefs.doorObjs.forEach((dObj) => {
+        dObj.pad.rotation.z = animTime * 1.1;
+        if (dObj.beacon) dObj.beacon.rotation.y = animTime * 0.8;
+        const dist = Math.hypot(state.playerPos.x - dObj.stage.doorPos.x, state.playerPos.z - dObj.stage.doorPos.z);
+        if (dist < 4.5) foundDoor = dObj.stage;
+      });
+
+      const promptEl = document.getElementById('door-prompt');
+      if (foundDoor) {
+        if (state.nearbyDoor !== foundDoor) {
+          state.nearbyDoor = foundDoor;
+          const unlocked = state.level >= foundDoor.levelReq;
+          document.getElementById('door-prompt-title').textContent = 'PUERTA ' + (foundDoor.id + 1) + ' • ' + foundDoor.name.toUpperCase();
+          document.getElementById('door-prompt-sub').textContent = unlocked
+            ? ('Rival: ' + foundDoor.rival + ' • ' + foundDoor.style + ' (' + foundDoor.bpm + ' BPM)')
+            : ('Bloqueada • Supera la Puerta ' + (foundDoor.levelReq - 1) + ' para entrar');
+          const btn = document.getElementById('btn-enter-door');
+          btn.disabled = !unlocked;
+          btn.textContent = unlocked ? 'ENTRAR A LA PASARELA ✨' : 'REQUIERE NIVEL ' + foundDoor.levelReq;
+        }
+        promptEl.classList.add('visible');
+      } else {
+        state.nearbyDoor = null;
+        promptEl.classList.remove('visible');
+      }
+
+      const targetCamX = state.playerPos.x;
+      const targetCamY = 8.4;
+      const targetCamZ = state.playerPos.z + 10.6;
+      camera.position.x += (targetCamX - camera.position.x) * 0.1;
+      camera.position.y += (targetCamY - camera.position.y) * 0.1;
+      camera.position.z += (targetCamZ - camera.position.z) * 0.1;
+      camera.lookAt(state.playerPos.x, 1.6, state.playerPos.z - 1.5);
+
+      drawMiniRadar();
+    } else if (state.mode === 'battle' && state.battle && battleRefs) {
+      const b = state.battle;
+      b.phaseElapsed += dt;
+      if (b.overdriveTime > 0) b.overdriveTime = Math.max(0, b.overdriveTime - dt);
+
+      if (b.phase === 'rival') {
+        // Turno 1: la Rival desfila sola en el centro de la pasarela
+        for (let i = 0; i < b.rivalBeats.length; i++) {
+          const rb = b.rivalBeats[i];
+          if (!rb.hit && b.phaseElapsed >= rb.time) {
+            rb.hit = true;
+            simulateRivalBeat(b, false);
+          }
+        }
+        battleRefs.rival.root.position.x += (0 - battleRefs.rival.root.position.x) * 0.12;
+        battleRefs.rival.root.position.z += (0.55 - battleRefs.rival.root.position.z) * 0.12;
+        battleRefs.player.root.position.x += (-3.25 - battleRefs.player.root.position.x) * 0.12;
+        battleRefs.player.root.position.z += (-1.55 - battleRefs.player.root.position.z) * 0.12;
+
+        animateCoutureBattle(battleRefs.rival, animTime, b.stage.bpm, 0.95, true);
+        animateCoutureBattle(battleRefs.player, animTime, b.stage.bpm, 0.3, false);
+
+        if (b.phaseElapsed >= b.rivalDuration) {
+          beginTurnTransition();
+        }
+      } else if (b.phase === 'transition') {
+        // Cambio coreográfico de turno: la rival sale al palco derecho y tú tomas el centro
+        battleRefs.rival.root.position.x += (3.25 - battleRefs.rival.root.position.x) * 0.09;
+        battleRefs.rival.root.position.z += (-1.55 - battleRefs.rival.root.position.z) * 0.09;
+        battleRefs.rival.root.rotation.y += (-0.52 - battleRefs.rival.root.rotation.y) * 0.09;
+
+        battleRefs.player.root.position.x += (0 - battleRefs.player.root.position.x) * 0.09;
+        battleRefs.player.root.position.z += (0.55 - battleRefs.player.root.position.z) * 0.09;
+        battleRefs.player.root.rotation.y += (0 - battleRefs.player.root.rotation.y) * 0.09;
+
+        animateCatwalkWalk(battleRefs.player, animTime, 1);
+        animateCatwalkWalk(battleRefs.rival, animTime, 0.8);
+
+        if (b.phaseElapsed >= 2.0) {
+          startPlayerTurn();
+        }
+      } else if (b.phase === 'player') {
+        // Turno 2: tu espacio exclusivo en la pasarela con la consola Model Bolivia 2026
+        for (let i = 0; i < b.playerBeats.length; i++) {
+          const pb = b.playerBeats[i];
+          if (!pb.hit && !pb.missed && b.phaseElapsed - pb.time > 0.38) {
+            pb.missed = true;
+            b.playerJudged++;
+            b.combo = 0;
+            showJudgment('PULSO PERDIDO', '#f43f5e');
+          }
+        }
+        battleRefs.player.root.position.x += (0 - battleRefs.player.root.position.x) * 0.12;
+        battleRefs.player.root.position.z += (0.55 - battleRefs.player.root.position.z) * 0.12;
+        battleRefs.rival.root.position.x += (3.25 - battleRefs.rival.root.position.x) * 0.12;
+        battleRefs.rival.root.position.z += (-1.55 - battleRefs.rival.root.position.z) * 0.12;
+
+        const pEnergy = b.overdriveTime > 0 ? 1.15 : Math.min(1, 0.50 + b.combo * 0.05);
+        animateCoutureBattle(battleRefs.player, animTime, b.stage.bpm, pEnergy, true);
+        animateCoutureBattle(battleRefs.rival, animTime, b.stage.bpm, 0.3, false);
+
+        if (b.phaseElapsed >= b.playerDuration) {
+          finishBattle();
+        }
+      }
+
+      if (battleRefs.spotlightPad) {
+        battleRefs.spotlightPad.rotation.z = animTime * 0.9;
+      }
+      if (battleRefs.shockRing && battleRefs.shockLife > 0) {
+        battleRefs.shockLife = Math.max(0, battleRefs.shockLife - dt);
+        const prog = 1 - (battleRefs.shockLife / 0.55);
+        const sc = 1 + prog * 2.6;
+        battleRefs.shockRing.scale.set(sc, sc, 1);
+        battleRefs.shockRing.material.opacity = (1 - prog) * 0.82;
+      }
+
+      battleRefs.particles.forEach((p) => {
+        if (p.life > 0) {
+          p.life -= dt;
+          p.mesh.position.x += p.vx;
+          p.mesh.position.y += p.vy;
+          p.mesh.position.z += p.vz;
+          p.vy -= 0.008;
+          p.mesh.rotation.x += 0.15;
+          if (p.life <= 0) p.mesh.visible = false;
+        }
+      });
+
+      // Cámara escénica dinámica: acerca ligeramente en poses Vogue/Gala para deleite del público
+      const activeModel = (b.phase === 'rival') ? battleRefs.rival : battleRefs.player;
+      const isClosePose = activeModel && activeModel.moveTimer > 0 && (activeModel.activeStep === 'vogue' || activeModel.activeStep === 'gala_bow');
+      const orbitSpeed = b.overdriveTime > 0 ? 1.05 : 0.48;
+      const tgtCamX = Math.sin(animTime * orbitSpeed) * (isClosePose ? 0.95 : (b.overdriveTime > 0 ? 2.15 : 1.55));
+      const tgtCamY = isClosePose ? 1.95 : 2.28;
+      const tgtCamZ = isClosePose ? 4.45 : 5.35;
+      camera.position.x += (tgtCamX - camera.position.x) * 0.08;
+      camera.position.y += (tgtCamY - camera.position.y) * 0.08;
+      camera.position.z += (tgtCamZ - camera.position.z) * 0.08;
+      camera.lookAt(0, isClosePose ? 1.32 : 1.24, 0.55);
+
+      updateBattleHUD();
+      drawRhythmTrack();
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', resizeCanvases);
+  window.addEventListener('load', async () => {
+    buildSantaCruzUrbanMap();
+    updateGlobalHUD();
+    updateMapHUDVisibility();
+    resizeCanvases();
+    requestAnimationFrame(animate);
+    await loadUsersFromDB();
+    // Pre-rellenar último usuario recordado para ingreso rápido
+    try {
+      const saved = JSON.parse(localStorage.getItem('ubc_saved_session') || 'null');
+      if (saved && saved.name) {
+        const inp = document.getElementById('login-username');
+        if (inp) inp.value = saved.name;
+      }
+    } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
