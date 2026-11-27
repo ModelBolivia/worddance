@@ -730,16 +730,35 @@
         <div class="admin-list" id="adm-sec-list"></div>
       </div>
 
-      <!-- TAB 4: ESTADO DE FIREBASE REALTIME DATABASE (PRODUCCIÓN) -->
+      <!-- TAB 4: ESTADO DE FIREBASE & CONFIGURACIÓN GLOBAL (/settings/gameConfig) -->
       <div class="admin-pane" id="admin-pane-database">
         <div class="music-status" id="adm-db-status">🟡 Sin conexión con Firebase</div>
         <div class="admin-card" style="margin-bottom:10px; font-size:11px; color:var(--muted);">
           <div><strong style="color:var(--gold);">Proyecto:</strong> wordmodelbolivia-3d-5fa07</div>
-          <div><strong style="color:var(--gold);">Realtime DB:</strong> https://wordmodelbolivia-3d-5fa07-default-rtdb.firebaseio.com</div>
           <div><strong style="color:var(--gold);">Ruta raíz:</strong> /urban_beat_camba_v1_db (100% Firebase Auth + RTDB)</div>
         </div>
+
+        <div class="admin-card" style="margin-bottom:10px; gap:8px;">
+          <div style="font-size:11px; font-weight:900; color:var(--gold);">⚙️ CONFIGURACIÓN GLOBAL (/settings/gameConfig)</div>
+          <div class="login-row-chk">
+            <label><input type="checkbox" id="cfg-live-clean" /> 🎥 Modo Limpio LIVE</label>
+            <label><input type="checkbox" id="cfg-guest-enabled" checked /> ⚡ Permitir Invitados</label>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; font-size:11px; color:var(--muted);">
+            <span style="white-space:nowrap;">🎚️ Dificultad:</span>
+            <select class="mini-input" id="cfg-difficulty">
+              <option value="0.85">Suave (0.85x)</option>
+              <option value="1" selected>Normal (1.0x)</option>
+              <option value="1.15">Pro (1.15x)</option>
+            </select>
+          </div>
+          <input type="text" class="mini-input" id="cfg-announcement" placeholder="Nota / estado interno (opcional)" />
+          <div class="music-status" id="adm-cfg-msg" style="margin-bottom:0; display:none;"></div>
+          <button class="primary-btn" id="btn-adm-save-gamecfg" style="margin:0; padding:8px; font-size:11px;">💾 Guardar Config Global en Firebase</button>
+        </div>
+
         <div class="music-row">
-          <button class="primary-btn" id="btn-adm-sync-now" style="margin:0; padding:9px; font-size:11px;">🔄 Sincronizar</button>
+          <button class="secondary-btn" id="btn-adm-sync-now" style="padding:9px; font-size:11px;">🔄 Sincronizar</button>
           <button class="secondary-btn" id="btn-adm-export-json" style="padding:9px; font-size:11px;">📋 Descargar JSON</button>
         </div>
       </div>
@@ -799,8 +818,119 @@
   let isAdminVerified = false;
   let isModeratorVerified = false;
   let manualAuthInProgress = false;
+  let activeDbListeners = [];
+  const gameConfig = {
+    liveCleanMode: false,
+    difficultyScale: 1.0,
+    guestEnabled: true,
+    announcement: ''
+  };
   function hasPanelAccess() {
     return isAdminVerified || isModeratorVerified;
+  }
+
+  function registerDbListener(ref, event, cb) {
+    ref.on(event, cb);
+    activeDbListeners.push({ ref, event, cb });
+  }
+
+  function detachRealtimeListeners() {
+    activeDbListeners.forEach((item) => {
+      try { item.ref.off(item.event, item.cb); } catch (e) {}
+    });
+    activeDbListeners = [];
+  }
+
+  function applyGameConfigToUI(cfg) {
+    if (!cfg || typeof cfg !== 'object') return;
+    gameConfig.liveCleanMode = Boolean(cfg.liveCleanMode);
+    gameConfig.difficultyScale = Math.max(0.7, Math.min(1.3, Number(cfg.difficultyScale) || 1.0));
+    gameConfig.guestEnabled = (typeof cfg.guestEnabled === 'boolean') ? cfg.guestEnabled : true;
+    gameConfig.announcement = String(cfg.announcement || '');
+
+    document.body.classList.toggle('live-clean', gameConfig.liveCleanMode);
+    const guestBtn = document.getElementById('btn-guest-login');
+    if (guestBtn) guestBtn.style.display = gameConfig.guestEnabled ? '' : 'none';
+
+    const chkLive = document.getElementById('cfg-live-clean');
+    const chkGuest = document.getElementById('cfg-guest-enabled');
+    const selDiff = document.getElementById('cfg-difficulty');
+    const inpAnn = document.getElementById('cfg-announcement');
+    if (chkLive) chkLive.checked = gameConfig.liveCleanMode;
+    if (chkGuest) chkGuest.checked = gameConfig.guestEnabled;
+    if (selDiff) selDiff.value = String(gameConfig.difficultyScale);
+    if (inpAnn) inpAnn.value = gameConfig.announcement;
+  }
+
+  function subscribePublicGameConfig() {
+    if (!database) return;
+    const cfgRef = database.ref(DB_NAMESPACE + '/settings/gameConfig');
+    cfgRef.on('value', (snap) => {
+      if (snap.val()) applyGameConfigToUI(snap.val());
+    });
+  }
+
+  function attachSessionRealtimeListeners() {
+    detachRealtimeListeners();
+    if (!database) return;
+
+    // 1. Listener en tiempo real sobre /profiles/<currentUid>/hasGameAccess
+    if (currentUid) {
+      const accessRef = database.ref(DB_NAMESPACE + '/profiles/' + currentUid + '/hasGameAccess');
+      registerDbListener(accessRef, 'value', async (snap) => {
+        if (snap.val() === false && !isAdminVerified && currentUid) {
+          await forceLogoutWithReason('Acceso restringido por administración.');
+        }
+      });
+    }
+
+    // 2. Listener en tiempo real sobre /battles (Top 10 Global e historial en vivo)
+    const battlesRef = database.ref(DB_NAMESPACE + '/battles').limitToLast(50);
+    registerDbListener(battlesRef, 'value', (snap) => {
+      battleHistoryDB = normalizeMapToList(snap.val()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+      if (adminModal && !adminModal.classList.contains('hidden')) {
+        renderAdminHistory(true);
+      }
+    });
+
+    // 3. Listener en tiempo real sobre /settings/music (pista Drive + BPM global)
+    const musicRef = database.ref(DB_NAMESPACE + '/settings/music');
+    registerDbListener(musicRef, 'value', (snap) => {
+      const val = snap.val();
+      if (!val) return;
+      if (typeof val.manualBpm === 'number' && val.manualBpm >= 72 && val.manualBpm <= 175) {
+        state.manualBpm = val.manualBpm;
+        if (typeof syncBpmUI === 'function') syncBpmUI();
+      } else if (val.manualBpm === null) {
+        state.manualBpm = null;
+        if (typeof syncBpmUI === 'function') syncBpmUI();
+      }
+      if (val.driveMusicUrl) {
+        const parsed = parseDriveAudioUrl(val.driveMusicUrl);
+        if (parsed && audio.customSrc !== parsed.primary) {
+          audio.setCustomTrack(parsed.primary, parsed.label, parsed.fallback);
+          const inp = document.getElementById('drive-url-input');
+          if (inp) inp.value = val.driveMusicUrl;
+          updateMusicStatusUI('Pista sincronizada en vivo (' + parsed.label + ').', true);
+        }
+      } else if (val.driveMusicUrl === '' && audio.customSrc && !audio.customSrc.startsWith('blob:')) {
+        audio.setCustomTrack('', '', '');
+        const inp = document.getElementById('drive-url-input');
+        if (inp) inp.value = '';
+        updateMusicStatusUI('Estado: Usando ritmos bolivianos originales (sin pista externa).', false);
+      }
+    });
+
+    // 4. Listener en tiempo real sobre /securityLogs para Admin / Moderadores
+    if (hasPanelAccess()) {
+      const logsRef = database.ref(DB_NAMESPACE + '/securityLogs').limitToLast(50);
+      registerDbListener(logsRef, 'value', (snap) => {
+        securityLogsDB = normalizeMapToList(snap.val()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        if (adminModal && !adminModal.classList.contains('hidden')) {
+          renderAdminSecurityLogs(true);
+        }
+      });
+    }
   }
 
   function safeDisplayAlias(rawName) {
@@ -854,6 +984,7 @@
     }
   }
   initExternalFirebase();
+  subscribePublicGameConfig();
 
   // Verificar privilegio de administrador únicamente contra /admins/$uid
   async function checkIsAdminUid(uid) {
@@ -977,6 +1108,8 @@
       cleared: state.cleared,
       bestRanks: state.bestRanks,
       totalScore: state.totalScore,
+      manualBpm: state.manualBpm,
+      soundOn: state.soundOn,
       updatedAt: Date.now()
     };
     if (database && auth && auth.currentUser && auth.currentUser.uid === currentUid) {
@@ -993,6 +1126,17 @@
       if (Array.isArray(p.cleared) && p.cleared.length === STAGES.length) state.cleared = p.cleared.map(Boolean);
       if (Array.isArray(p.bestRanks) && p.bestRanks.length === STAGES.length) state.bestRanks = p.bestRanks.map(String);
       state.totalScore = Number(p.totalScore) || 0;
+      if (typeof p.manualBpm === 'number' && p.manualBpm >= 72 && p.manualBpm <= 175) {
+        state.manualBpm = p.manualBpm;
+      }
+      if (typeof p.soundOn === 'boolean') {
+        state.soundOn = p.soundOn;
+        const sBtn = document.getElementById('btn-sound');
+        if (sBtn) {
+          sBtn.textContent = state.soundOn ? '🔊' : '🔇';
+          sBtn.classList.toggle('active', state.soundOn);
+        }
+      }
       document.querySelectorAll('.couture-opt').forEach((b, i) => b.classList.toggle('active', i === state.outfitIndex));
     };
 
@@ -1030,7 +1174,7 @@
     battleHistoryDB = [];
     if (!database) return battleHistoryDB;
     try {
-      const snap = await database.ref(DB_NAMESPACE + '/battles').limitToLast(40).once('value');
+      const snap = await database.ref(DB_NAMESPACE + '/battles').limitToLast(50).once('value');
       const list = normalizeMapToList(snap.val()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
       if (list.length) battleHistoryDB = list;
     } catch (e) {}
@@ -1041,12 +1185,13 @@
   function saveSharedMusicToDB(rawUrl) {
     if (!hasPanelAccess() || !database) return;
     const payload = {
-      driveMusicUrl: rawUrl || '',
+      driveMusicUrl: rawUrl !== undefined ? (rawUrl || '') : (document.getElementById('drive-url-input')?.value.trim() || ''),
+      manualBpm: state.manualBpm || null,
       updatedBy: safeDisplayAlias(currentUser || 'Admin'),
       updatedAt: Date.now()
     };
     database.ref(DB_NAMESPACE + '/settings/music').set(payload).catch((e) => console.error('Firebase DB error (settings/music):', e));
-    logSecurityEvent('MUSIC_UPDATE', currentUser, rawUrl ? 'Pista externa actualizada' : 'Restaurado synth original');
+    logSecurityEvent('MUSIC_UPDATE', currentUser, payload.driveMusicUrl ? ('Pista/BPM actualizado (' + (payload.manualBpm || 'AUTO') + ')') : 'Synth original (' + (payload.manualBpm || 'AUTO') + ' BPM)');
   }
 
   async function loadSharedMusicFromDB() {
@@ -2888,9 +3033,10 @@
     const roll = Math.random();
     let syncVal = 0;
     let pts = 0;
-    if (roll < stage.difficulty * 0.62) {
+    const effDiff = Math.min(0.98, stage.difficulty * (gameConfig.difficultyScale || 1.0));
+    if (roll < effDiff * 0.62) {
       syncVal = 100; pts = 160;
-    } else if (roll < stage.difficulty * 0.96) {
+    } else if (roll < effDiff * 0.96) {
       syncVal = 78; pts = 105;
     } else {
       syncVal = 35; pts = 30;
@@ -3472,6 +3618,7 @@
     buildSantaCruzUrbanMap();
     updateGlobalHUD();
     updateMapHUDVisibility();
+    attachSessionRealtimeListeners();
     loadSharedMusicFromDB();
   }
 
@@ -3568,6 +3715,13 @@
   async function performGuestLogin() {
     audio.init();
     const msgEl = document.getElementById('login-msg');
+    if (!gameConfig.guestEnabled) {
+      if (msgEl) {
+        msgEl.style.color = '#fda4af';
+        msgEl.textContent = 'El acceso como invitado está deshabilitado por administración.';
+      }
+      return;
+    }
     manualAuthInProgress = true;
     try {
       if (auth) {
@@ -3613,9 +3767,12 @@
     }
   });
 
-  document.getElementById('btn-logout').addEventListener('click', async () => {
+  async function forceLogoutWithReason(reasonMsg) {
     audio.stopBeat();
-    await logSecurityEvent('LOGOUT', currentUser, 'Sesión cerrada');
+    detachRealtimeListeners();
+    if (!reasonMsg && currentUid) {
+      await logSecurityEvent('LOGOUT', currentUser, 'Sesión cerrada');
+    }
     if (auth) {
       try { await auth.signOut(); } catch (e) {}
     }
@@ -3627,6 +3784,7 @@
     isModeratorVerified = false;
     state.level = 1;
     state.outfitIndex = 0;
+    state.manualBpm = null;
     state.cleared = [false, false, false, false, false];
     state.bestRanks = ['', '', '', '', ''];
     state.totalScore = 0;
@@ -3635,13 +3793,23 @@
     document.querySelectorAll('.couture-opt').forEach((b, i) => b.classList.toggle('active', i === 0));
     state.mode = 'title';
     document.getElementById('battle-ui').classList.remove('active');
+    document.getElementById('admin-modal').classList.add('hidden');
+    document.getElementById('music-modal').classList.add('hidden');
+    document.getElementById('result-modal').classList.add('hidden');
     document.getElementById('btn-exit-battle').style.display = 'none';
     document.getElementById('radar-box').style.display = 'block';
     updateGlobalHUD();
     updateSessionHUD();
     updateMapHUDVisibility();
+    const msgEl = document.getElementById('login-msg');
+    if (msgEl) {
+      msgEl.style.color = '#fda4af';
+      msgEl.textContent = reasonMsg || '';
+    }
     document.getElementById('start-modal').classList.remove('hidden');
-  });
+  }
+
+  document.getElementById('btn-logout').addEventListener('click', () => forceLogoutWithReason(''));
 
   // PANEL DE ADMINISTRACIÓN CONECTADO A PERFILES REALES (/profiles/$uid)
   const adminModal = document.getElementById('admin-modal');
@@ -3715,13 +3883,64 @@
         act.appendChild(banBtn);
       }
 
+      // Solo Admin puede ascender a Moderador o degradar a Jugadora en /moderators/$uid y /profiles/$uid/role
+      if (isAdminVerified && u.uid && u.role !== 'admin' && u.role !== 'guest') {
+        const modBtn = document.createElement('button');
+        const isModTarget = (u.role === 'subadmin');
+        modBtn.className = 'mini-btn ' + (isModTarget ? 'danger' : 'warn');
+        modBtn.textContent = isModTarget ? '🎧 Quitar Mod' : '🎧 Hacer Mod';
+        modBtn.addEventListener('click', async () => {
+          if (!database) return;
+          try {
+            if (isModTarget) {
+              await database.ref(DB_NAMESPACE + '/moderators/' + u.uid).remove();
+              await database.ref(DB_NAMESPACE + '/profiles/' + u.uid + '/role').set('player');
+              u.role = 'player';
+              await logSecurityEvent('ROLE_CHANGE', currentUser, safeDisplayAlias(u.alias || u.email) + ' -> player');
+              document.getElementById('adm-users-msg').textContent = safeDisplayAlias(u.alias || u.email) + ' pasó a Jugadora.';
+            } else {
+              await database.ref(DB_NAMESPACE + '/moderators/' + u.uid).set(true);
+              await database.ref(DB_NAMESPACE + '/profiles/' + u.uid + '/role').set('subadmin');
+              u.role = 'subadmin';
+              await logSecurityEvent('ROLE_CHANGE', currentUser, safeDisplayAlias(u.alias || u.email) + ' -> subadmin');
+              document.getElementById('adm-users-msg').textContent = safeDisplayAlias(u.alias || u.email) + ' ascendida a Moderador.';
+            }
+            renderAdminUsers();
+          } catch (e) {
+            console.error('Firebase DB error (role change):', e);
+            document.getElementById('adm-users-msg').textContent = 'Error cambiando rol en Firebase (revisa reglas /moderators).';
+          }
+        });
+        act.appendChild(modBtn);
+      }
+
+      // Reiniciar progreso en /progress/$uid (Admin sobre no-admin, Mod sobre player)
+      if (canToggleTarget) {
+        const rstBtn = document.createElement('button');
+        rstBtn.className = 'mini-btn';
+        rstBtn.textContent = '♻️ Reiniciar';
+        rstBtn.title = 'Reiniciar progreso en /progress/' + u.uid;
+        rstBtn.addEventListener('click', async () => {
+          if (!database) return;
+          try {
+            await database.ref(DB_NAMESPACE + '/progress/' + u.uid).remove();
+            await logSecurityEvent('PROGRESS_RESET', currentUser, 'Reinició progreso de ' + safeDisplayAlias(u.alias || u.email));
+            document.getElementById('adm-users-msg').textContent = 'Progreso reiniciado en Firebase para ' + safeDisplayAlias(u.alias || u.email);
+          } catch (e) {
+            console.error('Firebase DB error (progress reset):', e);
+            document.getElementById('adm-users-msg').textContent = 'Sin permiso en reglas RTDB para borrar /progress/' + u.uid.slice(0, 6);
+          }
+        });
+        act.appendChild(rstBtn);
+      }
+
       card.appendChild(act);
       listEl.appendChild(card);
     });
   }
 
-  async function renderAdminHistory() {
-    await loadBattleHistoryFromDB();
+  async function renderAdminHistory(skipFetch) {
+    if (!skipFetch) await loadBattleHistoryFromDB();
     const listEl = document.getElementById('adm-history-list');
     const sumEl = document.getElementById('adm-history-summary');
     const top10El = document.getElementById('adm-top10-box');
@@ -3801,8 +4020,8 @@
     });
   }
 
-  async function renderAdminSecurityLogs() {
-    await loadSecurityLogsFromDB();
+  async function renderAdminSecurityLogs(skipFetch) {
+    if (!skipFetch) await loadSecurityLogsFromDB();
     const listEl = document.getElementById('adm-sec-list');
     const sumEl = document.getElementById('adm-sec-summary');
     if (!listEl) return;
@@ -3929,6 +4148,31 @@
     }
   });
 
+  document.getElementById('btn-adm-save-gamecfg').addEventListener('click', async () => {
+    const msg = document.getElementById('adm-cfg-msg');
+    if (!hasPanelAccess() || !database) {
+      if (msg) { msg.style.display = 'block'; msg.style.color = '#fda4af'; msg.textContent = 'Requiere sesión de Admin o Moderador conectada.'; }
+      return;
+    }
+    const payload = {
+      liveCleanMode: Boolean(document.getElementById('cfg-live-clean')?.checked),
+      guestEnabled: Boolean(document.getElementById('cfg-guest-enabled')?.checked),
+      difficultyScale: Number(document.getElementById('cfg-difficulty')?.value) || 1.0,
+      announcement: (document.getElementById('cfg-announcement')?.value || '').trim().slice(0, 140),
+      updatedBy: safeDisplayAlias(currentUser || 'Admin'),
+      updatedAt: Date.now()
+    };
+    try {
+      await database.ref(DB_NAMESPACE + '/settings/gameConfig').set(payload);
+      applyGameConfigToUI(payload);
+      await logSecurityEvent('GAME_CONFIG_UPDATE', currentUser, 'LiveClean=' + payload.liveCleanMode + ', Guest=' + payload.guestEnabled + ', Diff=' + payload.difficultyScale);
+      if (msg) { msg.style.display = 'block'; msg.style.color = '#34d399'; msg.textContent = 'Configuración global sincronizada en Firebase.'; }
+    } catch (e) {
+      console.error('Firebase DB error (settings/gameConfig):', e);
+      if (msg) { msg.style.display = 'block'; msg.style.color = '#fda4af'; msg.textContent = 'Error guardando en /settings/gameConfig (revisa reglas Firebase).'; }
+    }
+  });
+
   document.getElementById('btn-adm-sync-now').addEventListener('click', async () => {
     await saveGameProgressToDB();
     await loadBattleHistoryFromDB();
@@ -3979,6 +4223,7 @@
     const btn = document.getElementById('btn-sound');
     btn.textContent = state.soundOn ? '🔊' : '🔇';
     btn.classList.toggle('active', state.soundOn);
+    saveGameProgressToDB();
   });
 
   document.getElementById('btn-exit-battle').addEventListener('click', returnToMap);
@@ -4053,6 +4298,10 @@
       state.manualBpm = Math.max(72, Math.min(175, parseInt(bpmSlider.value, 10) || 120));
       syncBpmUI();
     });
+    bpmSlider.addEventListener('change', () => {
+      saveGameProgressToDB();
+      if (hasPanelAccess()) saveSharedMusicToDB();
+    });
   }
   const btnTapTempo = document.getElementById('btn-tap-tempo');
   if (btnTapTempo) {
@@ -4076,6 +4325,8 @@
       state.manualBpm = null;
       tapStamps = [];
       syncBpmUI();
+      saveGameProgressToDB();
+      if (hasPanelAccess()) saveSharedMusicToDB();
     });
   }
 
