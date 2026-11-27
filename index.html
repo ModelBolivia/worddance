@@ -1598,18 +1598,68 @@
   let mapRefs = null;
   let battleRefs = null;
 
+  const sharedGeoSet = new Set();
+  const sharedMatSet = new Set();
+  let festiveCache = null;
+
+  function trackSharedGeo(geo) { sharedGeoSet.add(geo); return geo; }
+  function trackSharedMat(mat) { sharedMatSet.add(mat); return mat; }
+
+  function getFestiveCache() {
+    if (festiveCache) return festiveCache;
+    festiveCache = {
+      geo: {
+        skirt: trackSharedGeo(new THREE.ConeGeometry(0.24, 0.72, 8)),
+        torsoF: trackSharedGeo(new THREE.CylinderGeometry(0.12, 0.15, 0.44, 8)),
+        leg: trackSharedGeo(new THREE.CylinderGeometry(0.055, 0.048, 0.68, 6)),
+        torsoM: trackSharedGeo(new THREE.CylinderGeometry(0.15, 0.14, 0.52, 8)),
+        scarf: trackSharedGeo(new THREE.TorusGeometry(0.11, 0.025, 5, 10)),
+        head: trackSharedGeo(new THREE.SphereGeometry(0.135, 10, 8)),
+        hair: trackSharedGeo(new THREE.SphereGeometry(0.145, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.6)),
+        flower: trackSharedGeo(new THREE.DodecahedronGeometry(0.045, 0)),
+        brim: trackSharedGeo(new THREE.CylinderGeometry(0.26, 0.27, 0.02, 12)),
+        crown: trackSharedGeo(new THREE.CylinderGeometry(0.11, 0.13, 0.11, 10)),
+        band: trackSharedGeo(new THREE.CylinderGeometry(0.134, 0.134, 0.028, 10)),
+        arm: trackSharedGeo(new THREE.CylinderGeometry(0.036, 0.030, 0.44, 6)),
+        stick: trackSharedGeo(new THREE.CylinderGeometry(0.015, 0.018, 0.95, 5)),
+        flag: trackSharedGeo(new THREE.PlaneGeometry(0.56, 0.34)),
+        bunting: trackSharedGeo(new THREE.ConeGeometry(0.26, 0.46, 3)),
+        confetti: trackSharedGeo(new THREE.PlaneGeometry(0.16, 0.10))
+      },
+      mat: {
+        skins: [0xf0bc98, 0xe5aa84, 0xd99b72, 0xf3c6a8].map((c) => trackSharedMat(new THREE.MeshLambertMaterial({ color: c }))),
+        fOutfits: [0xec4899, 0x10b981, 0xfacc15, 0x38bdf8, 0xf43f5e, 0xa855f7].map((c) => trackSharedMat(new THREE.MeshLambertMaterial({ color: c }))),
+        mOutfits: [0xf8fafc, 0xecfdf5, 0xfef9c3, 0xe0f2fe].map((c) => trackSharedMat(new THREE.MeshLambertMaterial({ color: c }))),
+        pant: trackSharedMat(new THREE.MeshLambertMaterial({ color: 0x1e293b })),
+        hair: trackSharedMat(new THREE.MeshLambertMaterial({ color: 0x1c120c })),
+        hat: trackSharedMat(new THREE.MeshLambertMaterial({ color: 0xf3e0b5 })),
+        greenBand: trackSharedMat(new THREE.MeshBasicMaterial({ color: 0x007934 })),
+        redScarf: trackSharedMat(new THREE.MeshBasicMaterial({ color: 0xd52b1e })),
+        pinkFl: trackSharedMat(new THREE.MeshBasicMaterial({ color: 0xf472b6 })),
+        goldFl: trackSharedMat(new THREE.MeshBasicMaterial({ color: 0xfacc15 })),
+        flagBol: trackSharedMat(new THREE.MeshBasicMaterial({ map: getFlagTexture('bolivia'), side: THREE.DoubleSide })),
+        flagScz: trackSharedMat(new THREE.MeshBasicMaterial({ map: getFlagTexture('scz'), side: THREE.DoubleSide })),
+        buntingCols: [0xd52b1e, 0xf9e300, 0x007934, 0xffffff, 0x007934, 0xf472b6].map((c) => trackSharedMat(new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }))),
+        confCols: [0xfacc15, 0x34d399, 0xf472b6, 0xd52b1e, 0xffffff, 0x38bdf8].map((c) => trackSharedMat(new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide })))
+      }
+    };
+    return festiveCache;
+  }
+
   function disposeObject3D(obj) {
     if (!obj) return;
     const cachedTextures = new Set(Object.values(texCache));
     obj.traverse((child) => {
-      if (child.geometry) child.geometry.dispose();
+      if (child.geometry && !sharedGeoSet.has(child.geometry)) child.geometry.dispose();
       if (child.material) {
         if (Array.isArray(child.material)) {
           child.material.forEach((m) => {
-            if (m.map && !cachedTextures.has(m.map)) m.map.dispose();
-            m.dispose();
+            if (!sharedMatSet.has(m)) {
+              if (m.map && !cachedTextures.has(m.map)) m.map.dispose();
+              m.dispose();
+            }
           });
-        } else {
+        } else if (!sharedMatSet.has(child.material)) {
           if (child.material.map && !cachedTextures.has(child.material.map)) child.material.map.dispose();
           child.material.dispose();
         }
@@ -2556,6 +2606,125 @@
     return grp;
   }
 
+  // =========================================================================
+  // 7B. PÚBLICO BOLIVIANO CAMBA CON BANDERAS Y AMBIENTE FESTIVO DE REINAS
+  // =========================================================================
+  function createBolivianSpectator(x, z, idx, flagKind) {
+    const fc = getFestiveCache();
+    const grp = new THREE.Group();
+    const isFemale = (idx % 2 === 0);
+    const skinMat = fc.mat.skins[idx % fc.mat.skins.length];
+    const clothMat = isFemale
+      ? fc.mat.fOutfits[idx % fc.mat.fOutfits.length]
+      : fc.mat.mOutfits[idx % fc.mat.mOutfits.length];
+
+    const bodyRig = new THREE.Group();
+    grp.add(bodyRig);
+
+    if (isFemale) {
+      const skirt = new THREE.Mesh(fc.geo.skirt, clothMat);
+      skirt.position.y = 0.42;
+      const torso = new THREE.Mesh(fc.geo.torsoF, clothMat);
+      torso.position.y = 0.94;
+      bodyRig.add(skirt, torso);
+    } else {
+      [-0.08, 0.08].forEach((lx) => {
+        const leg = new THREE.Mesh(fc.geo.leg, fc.mat.pant);
+        leg.position.set(lx, 0.34, 0);
+        bodyRig.add(leg);
+      });
+      const torso = new THREE.Mesh(fc.geo.torsoM, clothMat);
+      torso.position.y = 0.92;
+      const scarf = new THREE.Mesh(fc.geo.scarf, idx % 4 === 1 ? fc.mat.greenBand : fc.mat.redScarf);
+      scarf.rotation.x = Math.PI / 2;
+      scarf.position.y = 1.15;
+      bodyRig.add(torso, scarf);
+    }
+
+    const head = new THREE.Mesh(fc.geo.head, skinMat);
+    head.position.y = 1.32;
+    bodyRig.add(head);
+
+    if (isFemale) {
+      const hair = new THREE.Mesh(fc.geo.hair, fc.mat.hair);
+      hair.position.set(0, 1.35, -0.02);
+      const flower = new THREE.Mesh(fc.geo.flower, idx % 4 === 0 ? fc.mat.pinkFl : fc.mat.goldFl);
+      flower.position.set(0.11, 1.40, 0.05);
+      bodyRig.add(hair, flower);
+    } else {
+      const brim = new THREE.Mesh(fc.geo.brim, fc.mat.hat);
+      brim.position.y = 1.42;
+      const crown = new THREE.Mesh(fc.geo.crown, fc.mat.hat);
+      crown.position.y = 1.48;
+      const band = new THREE.Mesh(fc.geo.band, fc.mat.greenBand);
+      band.position.y = 1.44;
+      bodyRig.add(brim, crown, band);
+    }
+
+    const armL = new THREE.Group();
+    armL.position.set(-0.18, 1.12, 0);
+    const armLMesh = new THREE.Mesh(fc.geo.arm, skinMat);
+    armLMesh.position.y = 0.18;
+    armL.add(armLMesh);
+    bodyRig.add(armL);
+
+    const armR = new THREE.Group();
+    armR.position.set(0.18, 1.12, 0);
+    const armRMesh = new THREE.Mesh(fc.geo.arm, skinMat);
+    armRMesh.position.y = 0.18;
+    armR.add(armRMesh);
+
+    let flagCloth = null;
+    if (flagKind) {
+      const stick = new THREE.Mesh(fc.geo.stick, fc.mat.goldFl);
+      stick.position.set(0, 0.65, 0.04);
+      flagCloth = new THREE.Mesh(fc.geo.flag, flagKind === 'bolivia' ? fc.mat.flagBol : fc.mat.flagScz);
+      flagCloth.position.set(0.28, 0.95, 0.04);
+      armR.add(stick, flagCloth);
+    }
+    bodyRig.add(armR);
+
+    grp.position.set(x, 0, z);
+    return { grp, bodyRig, armL, armR, flagCloth, phase: idx * 0.85 };
+  }
+
+  function createFestiveBunting(x1, y1, z1, x2, y2, z2, count) {
+    const fc = getFestiveCache();
+    const grp = new THREE.Group();
+    const n = count || 12;
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      const px = x1 + (x2 - x1) * t;
+      const pz = z1 + (z2 - z1) * t;
+      const sag = Math.sin(t * Math.PI) * 0.85;
+      const py = y1 + (y2 - y1) * t - sag;
+      const tri = new THREE.Mesh(fc.geo.bunting, fc.mat.buntingCols[i % fc.mat.buntingCols.length]);
+      tri.rotation.x = Math.PI;
+      tri.position.set(px, py, pz);
+      grp.add(tri);
+    }
+    return grp;
+  }
+
+  function animateSpectatorCrowd(crowd, t, bpm, hypeBoost, lookTarget) {
+    if (!crowd || !crowd.length) return;
+    const rate = (bpm / 60) * Math.PI;
+    const boost = hypeBoost || 1;
+    for (let i = 0; i < crowd.length; i++) {
+      const sp = crowd[i];
+      const p = t * rate + sp.phase;
+      sp.bodyRig.position.y = Math.abs(Math.sin(p)) * 0.14 * boost;
+      sp.armL.rotation.z = 0.35 + Math.sin(p * 1.4) * 0.55;
+      sp.armR.rotation.z = -0.25 - Math.cos(p * 1.4) * 0.52;
+      if (sp.flagCloth) {
+        sp.flagCloth.rotation.y = Math.sin(t * 6.5 + sp.phase) * 0.38;
+      }
+      if (lookTarget) {
+        sp.grp.lookAt(lookTarget.x, 0, lookTarget.z);
+      }
+    }
+  }
+
   function buildSantaCruzUrbanMap() {
     clearWorld();
     const g = new THREE.Group();
@@ -2743,7 +2912,29 @@
 
     scene.add(g);
     activeWorldGroup = g;
-    mapRefs = { player, doorObjs, obstacles, pointer, palmCrowns, flags };
+    // 8. PÚBLICO BOLIVIANO CAMBA SALUDANDO A LA REINA CON BANDERAS DE BOLIVIA Y SANTA CRUZ
+    const mapCrowd = [];
+    const crowdSpots = [
+      [-9.2, 4.5, 'bolivia'], [9.2, 4.5, 'scz'],
+      [-10.2, -2.5, 'scz'], [10.2, -2.5, 'bolivia'],
+      [-6.5, 9.6, 'scz'], [6.5, 9.6, 'bolivia'],
+      [-5.5, -10.4, 'bolivia'], [5.5, -10.4, 'scz'],
+      [-14.5, -8.5, 'scz'], [14.5, -8.5, 'bolivia'],
+      [-14.5, 8.5, 'bolivia'], [14.5, 8.5, 'scz'],
+      [-4.8, -17.5, 'scz'], [4.8, -17.5, 'bolivia']
+    ];
+    crowdSpots.forEach(([cx, cz, fKind], idx) => {
+      const sp = createBolivianSpectator(cx, cz, idx, fKind);
+      sp.grp.lookAt(0, 0, 0);
+      g.add(sp.grp);
+      mapCrowd.push(sp);
+    });
+
+    // Guirnaldas festivas bolivianas alrededor de la Plaza Central
+    g.add(createFestiveBunting(-7.5, 6.4, -7.5, 7.5, 6.4, -7.5, 14));
+    g.add(createFestiveBunting(-7.0, 5.0, -14.0, 7.0, 5.0, -14.0, 12));
+
+    mapRefs = { player, doorObjs, obstacles, pointer, palmCrowns, flags, crowd: mapCrowd };
   }
 
   // =========================================================================
@@ -2864,7 +3055,90 @@
     shockRing.position.set(0, 0.06, 0.55);
     g.add(shockRing);
 
-    battleRefs = { player, rival, particles, stage, spotlightPad, spotlightBeam, shockRing, shockLife: 0 };
+    // === AMBIENTE SÚPER ALEGRE DE BATALLA DE REINAS BOLIVIANA ===
+    // 1. Arco Real de Corona y Flores de Tajibo detrás de la pasarela
+    const archGroup = new THREE.Group();
+    const archMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+    const archTorus = new THREE.Mesh(new THREE.TorusGeometry(4.4, 0.14, 10, 32, Math.PI), archMat);
+    archTorus.position.set(0, 0.2, -3.6);
+    archGroup.add(archTorus);
+    const flowerCols = [0xf472b6, 0xfacc15, 0x34d399, 0xd52b1e];
+    for (let f = 0; f <= 8; f++) {
+      const a = (f / 8) * Math.PI;
+      const fl = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.28, 0),
+        new THREE.MeshBasicMaterial({ color: flowerCols[f % flowerCols.length] })
+      );
+      fl.position.set(Math.cos(a) * 4.4, 0.2 + Math.sin(a) * 4.4, -3.5);
+      archGroup.add(fl);
+    }
+    g.add(archGroup);
+
+    // 2. Guirnaldas festivas de banderines bolivianos y cruceños cruzando el escenario
+    g.add(createFestiveBunting(-5.6, 5.2, -5.5, 5.6, 5.2, -5.5, 14));
+    g.add(createFestiveBunting(-6.8, 4.6, -1.5, -5.6, 5.2, -5.5, 8));
+    g.add(createFestiveBunting(6.8, 4.6, -1.5, 5.6, 5.2, -5.5, 8));
+
+    // 3. Globos festivos flotantes en colores de fiesta boliviana
+    const balloons = [];
+    const bCols = [0xd52b1e, 0xf9e300, 0x007934, 0xf472b6, 0x38bdf8, 0xffffff];
+    [[-6.2, 3.2, -2.5], [6.2, 3.2, -2.5], [-4.8, 3.8, -5.8], [4.8, 3.8, -5.8], [-6.8, 2.9, 1.2], [6.8, 2.9, 1.2]].forEach(([bx, by, bz], idx) => {
+      const bMesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.36, 10, 8),
+        new THREE.MeshLambertMaterial({ color: bCols[idx % bCols.length] })
+      );
+      bMesh.scale.set(0.92, 1.15, 0.92);
+      bMesh.position.set(bx, by, bz);
+      g.add(bMesh);
+      balloons.push({ mesh: bMesh, baseY: by, phase: idx * 1.1 });
+    });
+
+    // 4. Dos haces de luces festivas giratorias en el cielo del espectáculo
+    const showBeams = [];
+    [-4.8, 4.8].forEach((bx, idx) => {
+      const pivot = new THREE.Group();
+      pivot.position.set(bx, 0.2, -4.2);
+      const cone = new THREE.Mesh(
+        new THREE.ConeGeometry(1.1, 11, 10, 1, true),
+        new THREE.MeshBasicMaterial({ color: idx === 0 ? 0xfacc15 : stage.accent, transparent: true, opacity: 0.13, side: THREE.DoubleSide, depthWrite: false })
+      );
+      cone.position.y = 5.5;
+      cone.rotation.x = Math.PI;
+      pivot.add(cone);
+      g.add(pivot);
+      showBeams.push(pivot);
+    });
+
+    // 5. Público Boliviano Camba festejando en semicírculo alrededor de la pasarela con banderas
+    const arenaCrowd = [];
+    const totalFans = 16;
+    for (let i = 0; i < totalFans; i++) {
+      const tAng = -Math.PI * 0.88 + (i / (totalFans - 1)) * (Math.PI * 0.76);
+      const rad = (i % 2 === 0) ? 5.65 : 6.75;
+      const fx = Math.cos(tAng) * rad;
+      const fz = Math.sin(tAng) * rad - 0.2;
+      const flagKind = (i % 3 === 0) ? 'bolivia' : ((i % 3 === 1) ? 'scz' : null);
+      const fan = createBolivianSpectator(fx, fz, i, flagKind);
+      fan.grp.lookAt(0, 0, 0.55);
+      g.add(fan.grp);
+      arenaCrowd.push(fan);
+    }
+
+    // 6. Lluvia ligera de confeti (20 piezas con geometría y materiales compartidos para 60 FPS móvil)
+    const fc = getFestiveCache();
+    const confetti = [];
+    for (let c = 0; c < 20; c++) {
+      const cm = new THREE.Mesh(fc.geo.confetti, fc.mat.confCols[c % fc.mat.confCols.length]);
+      cm.position.set((Math.random() - 0.5) * 11, 0.8 + Math.random() * 5.8, (Math.random() - 0.5) * 9 - 0.5);
+      g.add(cm);
+      confetti.push({ mesh: cm, speed: 0.75 + Math.random() * 1.1, sway: Math.random() * 6.28, spin: 2 + Math.random() * 4 });
+    }
+
+    battleRefs = {
+      player, rival, particles, stage, spotlightPad, spotlightBeam,
+      shockRing, shockLife: 0, crowd: arenaCrowd, crowdHype: 1.0,
+      confetti, balloons, showBeams
+    };
   }
 
   function spawnBattleBurst(x, colorHex) {
@@ -2948,6 +3222,7 @@
         battleRefs.shockLife = 0.55;
       }
       spawnBattleBurst(0, colorHex);
+      battleRefs.crowdHype = 2.15;
     }
     if (withFlash) {
       const fl = document.getElementById('paparazzi-flash');
@@ -4304,6 +4579,7 @@
     });
   }
   const btnTapTempo = document.getElementById('btn-tap-tempo');
+  let tapSyncTimer = null;
   if (btnTapTempo) {
     btnTapTempo.addEventListener('click', () => {
       const now = performance.now();
@@ -4316,6 +4592,11 @@
         const avgMs = sum / (tapStamps.length - 1);
         state.manualBpm = Math.max(72, Math.min(175, Math.round(60000 / avgMs)));
         syncBpmUI();
+        if (tapSyncTimer) clearTimeout(tapSyncTimer);
+        tapSyncTimer = setTimeout(() => {
+          saveGameProgressToDB();
+          if (hasPanelAccess()) saveSharedMusicToDB();
+        }, 550);
       }
     });
   }
@@ -4358,6 +4639,9 @@
       mapRefs.flags.forEach((fl, i) => {
         fl.rotation.y = Math.sin(animTime * 3.8 + i) * 0.16;
       });
+      if (mapRefs.crowd) {
+        animateSpectatorCrowd(mapRefs.crowd, animTime, 108, 1.0, state.playerPos);
+      }
     }
 
     if (state.mode === 'title' && mapRefs) {
@@ -4524,6 +4808,35 @@
 
       if (battleRefs.spotlightPad) {
         battleRefs.spotlightPad.rotation.z = animTime * 0.9;
+      }
+      if (battleRefs.crowd) {
+        battleRefs.crowdHype = Math.max(1.0, (battleRefs.crowdHype || 1.0) - dt * 1.4);
+        const effHype = b.overdriveTime > 0 ? 2.2 : battleRefs.crowdHype;
+        animateSpectatorCrowd(battleRefs.crowd, animTime, state.manualBpm || b.stage.bpm, effHype, null);
+      }
+      if (battleRefs.balloons) {
+        battleRefs.balloons.forEach((bl) => {
+          bl.mesh.position.y = bl.baseY + Math.sin(animTime * 2.2 + bl.phase) * 0.22;
+        });
+      }
+      if (battleRefs.showBeams) {
+        const beamSpd = b.overdriveTime > 0 ? 2.4 : 1.1;
+        battleRefs.showBeams.forEach((bm, idx) => {
+          bm.rotation.z = Math.sin(animTime * beamSpd + idx * Math.PI) * 0.45;
+          bm.rotation.x = Math.cos(animTime * beamSpd * 0.7 + idx) * 0.25;
+        });
+      }
+      if (battleRefs.confetti) {
+        battleRefs.confetti.forEach((cf) => {
+          cf.mesh.position.y -= cf.speed * dt;
+          cf.mesh.position.x += Math.sin(animTime * 2.5 + cf.sway) * 0.4 * dt;
+          cf.mesh.rotation.x += cf.spin * dt;
+          cf.mesh.rotation.y += cf.spin * 0.8 * dt;
+          if (cf.mesh.position.y < 0.15) {
+            cf.mesh.position.y = 6.2 + Math.random() * 1.2;
+            cf.mesh.position.x = (Math.random() - 0.5) * 11;
+          }
+        });
       }
       if (battleRefs.shockRing && battleRefs.shockLife > 0) {
         battleRefs.shockLife = Math.max(0, battleRefs.shockLife - dt);
