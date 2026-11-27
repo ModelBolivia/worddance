@@ -491,6 +491,58 @@
   }
   #battle-ui.active #btn-mv-fx { display: inline-flex; align-items: center; gap: 4px; }
 
+  /* MODO PORTADA EDITORIAL EN VIVO (VOGUE / MODEL BOLIVIA COVER) */
+  #mv-cover-frame {
+    position: absolute; inset: 18px 14px; border: 2px solid rgba(250, 204, 21, 0.78);
+    display: none; pointer-events: none; z-index: 4;
+  }
+  #mv-fx-overlay.mode-cover #mv-cover-frame { display: block; }
+  .mv-cover-mast {
+    position: absolute; top: 8px; left: 0; right: 0; text-align: center;
+    font-size: clamp(22px, 5vw, 44px); font-weight: 900; letter-spacing: 6px;
+    color: rgba(254, 240, 138, 0.88); text-shadow: 0 4px 18px rgba(0,0,0,0.75);
+  }
+  .mv-cover-sub {
+    position: absolute; bottom: 14px; left: 14px; right: 14px;
+    display: flex; justify-content: space-between; font-size: 10px; font-weight: 900;
+    letter-spacing: 1.5px; color: #f8fafc; text-transform: uppercase;
+  }
+
+  /* INTRO CINEMATOGRÁFICA DE BATALLA */
+  #mv-intro-banner {
+    position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%) scale(0.92);
+    z-index: 26; pointer-events: none; text-align: center;
+    padding: 12px 24px; border-radius: 16px;
+    background: rgba(5, 9, 18, 0.88);
+    border: 1.5px solid rgba(250, 204, 21, 0.85);
+    opacity: 0; transition: opacity 0.35s ease, transform 0.35s ease;
+  }
+  #mv-intro-banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  #mv-intro-kicker { font-size: 10px; font-weight: 900; letter-spacing: 2px; color: #34d399; }
+  #mv-intro-title { font-size: 20px; font-weight: 900; color: #facc15; margin-top: 2px; }
+  #mv-intro-sub { font-size: 11px; color: #f1f5f9; margin-top: 2px; }
+
+  /* MAPA DE LA SAGA (10 MUNDOS) */
+  .saga-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 8px; max-height: 52vh; overflow-y: auto; text-align: left; margin: 10px 0 12px;
+    padding-right: 4px;
+  }
+  .saga-card {
+    background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .saga-card.active-world { border-color: #34d399; box-shadow: 0 0 12px rgba(52, 211, 153, 0.25); }
+  .saga-card.world-10 { border-color: #facc15; background: linear-gradient(135deg, rgba(30,27,75,0.95), rgba(15,23,42,0.95)); }
+  .saga-badge { font-size: 9px; font-weight: 900; letter-spacing: 0.8px; color: #facc15; text-transform: uppercase; }
+  .saga-title { font-size: 13px; font-weight: 900; color: #fff; }
+  .saga-desc { font-size: 11px; color: #cbd5e1; line-height: 1.3; }
+  .saga-go-btn {
+    margin-top: 4px; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(250,204,21,0.5);
+    background: rgba(250,204,21,0.16); color: #fef08a; font-size: 11px; font-weight: 800; cursor: pointer;
+  }
+  .saga-go-btn:disabled { opacity: 0.5; cursor: default; border-color: rgba(148,163,184,0.3); color: #94a3b8; background: rgba(30,41,59,0.6); }
+
   /* DRIVE MUSIC MODAL */
   .music-input {
     width: 100%; padding: 10px 12px; border-radius: 11px;
@@ -627,6 +679,7 @@
 
     <div class="top-right-group">
       <div class="icon-row">
+        <button class="hud-btn" id="btn-saga-map" style="border-color:var(--emerald-bright); color:var(--emerald-bright);" title="Mapa de la Saga (10 Mundos)">🌍</button>
         <button class="hud-btn" id="btn-outfit" title="Cambiar traje">👗</button>
         <button class="hud-btn" id="btn-music-modal" title="Pista Drive / MP3">🎵</button>
         <button class="hud-btn active" id="btn-sound" title="Audio">🔊</button>
@@ -681,6 +734,15 @@
       <span class="mv-eq-bar"></span><span class="mv-eq-bar"></span><span class="mv-eq-bar"></span><span class="mv-eq-bar"></span>
     </div>
     <div class="mv-cam-tag right" id="mv-cam-b-label"><span class="mv-cam-dot"></span>CAM B • VIDEOCLIP</div>
+    <div id="mv-cover-frame">
+      <div class="mv-cover-mast">MODEL BOLIVIA</div>
+      <div class="mv-cover-sub"><span>EDICIÓN 2026 • EN VIVO</span><span id="mv-cover-stage">SANTA CRUZ 24K</span></div>
+    </div>
+  </div>
+  <div id="mv-intro-banner">
+    <div id="mv-intro-kicker">EN VIVO • SAGA 10 MUNDOS</div>
+    <div id="mv-intro-title">PASARELA DE REINAS</div>
+    <div id="mv-intro-sub">MODEL BOLIVIA 2026</div>
   </div>
 
   <!-- BATTLE UI LIMPIO (SIN ANUNCIOS FLOTANTES) -->
@@ -901,6 +963,18 @@
       </div>
       <button class="primary-btn" id="btn-res-primary">VOLVER A SANTA CRUZ 🗺️</button>
       <button class="secondary-btn" id="btn-res-secondary">REPETIR PASARELA</button>
+      <button class="secondary-btn" id="btn-res-saga" style="margin-top:6px; border-color:var(--emerald-bright); color:var(--emerald-bright);">🌍 VER SAGA DE 10 MUNDOS</button>
+    </div>
+  </div>
+
+  <!-- MODAL MAPA DE LA SAGA: 10 MUNDOS CONECTADOS A FIREBASE -->
+  <div class="modal-screen hidden" id="saga-modal">
+    <div class="modal-box" style="max-width:680px;">
+      <div class="brand-kicker" style="color:var(--emerald-bright);">MISMA BASE DE DATOS FIREBASE • PROGRESO GLOBAL</div>
+      <h2 style="margin:4px 0 4px;">🌍 SAGA MODEL BOLIVIA: 10 MUNDOS</h2>
+      <p id="saga-progress-summary" style="font-size:12px; color:var(--cream); margin-bottom:6px;">Mundo 1 en curso • Completa las 5 puertas de Santa Cruz para abrir el Portal a Mundo 2.</p>
+      <div class="saga-grid" id="saga-worlds-grid"></div>
+      <button class="primary-btn" id="btn-close-saga">SEGUIR EN SANTA CRUZ ✨</button>
     </div>
   </div>
 </div>
@@ -983,11 +1057,18 @@
     if (inpAnn) inpAnn.value = gameConfig.announcement;
   }
 
+  let sagaRemoteLinks = {};
   function subscribePublicGameConfig() {
     if (!database) return;
     const cfgRef = database.ref(DB_NAMESPACE + '/settings/gameConfig');
     cfgRef.on('value', (snap) => {
       if (snap.val()) applyGameConfigToUI(snap.val());
+    });
+    const sagaRef = database.ref(DB_NAMESPACE + '/settings/sagaLinks');
+    sagaRef.on('value', (snap) => {
+      if (snap.exists() && snap.val()) {
+        sagaRemoteLinks = snap.val();
+      }
     });
   }
 
@@ -1233,8 +1314,17 @@
       soundOn: state.soundOn,
       updatedAt: Date.now()
     };
+    const clearedCount = state.cleared.filter(Boolean).length;
+    payload.sagaWorld1Completed = clearedCount >= STAGES.length;
     if (database && auth && auth.currentUser && auth.currentUser.uid === currentUid) {
-      database.ref(DB_NAMESPACE + '/progress/' + currentUid).set(payload).catch((e) => console.error('Firebase DB error (progress):', e));
+      database.ref(DB_NAMESPACE + '/progress/' + currentUid).update(payload).catch((e) => console.error('Firebase DB error (progress):', e));
+      database.ref(DB_NAMESPACE + '/progress/' + currentUid + '/sagaWorlds/mundo1').update({
+        completed: clearedCount >= STAGES.length,
+        clearedCount,
+        totalScore: state.totalScore,
+        unlockedNext: clearedCount >= STAGES.length,
+        updatedAt: Date.now()
+      }).catch((e) => console.error('Firebase DB error (sagaWorlds):', e));
     }
   }
 
@@ -1271,6 +1361,7 @@
   // Escritura concurrente segura (.push()) en /battles/$battleId cumpliendo .validate
   function recordBattleToDB(record) {
     const cleanRec = {
+      world: String(record.world || 'mundo1'),
       user: safeDisplayAlias(record.user || currentUser || 'Invitado'),
       uid: currentUid || '',
       stageName: String(record.stageName || 'Pasarela'),
@@ -1713,8 +1804,85 @@
     { id: 'triptych', label: 'TRÍPTICO' },
     { id: 'cinema219', label: 'CINE 21:9' },
     { id: 'glam360', label: 'GLAM 360°' },
-    { id: 'neon', label: 'NEÓN VIP' }
+    { id: 'neon', label: 'NEÓN VIP' },
+    { id: 'cover', label: 'PORTADA' }
   ];
+
+  const SAGA_WORLDS = [
+    { id: 'mundo1', num: 1, url: 'https://wordmodelbolivia.modelsoft.sbs/', name: 'Santa Cruz • Pasarela Tajibo 24K', desc: 'Plaza 24, Catedral, Cristo Redentor, alta costura camba y director de videoclip.', active: true },
+    { id: 'mundo2', num: 2, url: 'https://wordmodelbolivia2.modelsoft.sbs/', name: 'Potosí • Salar de Uyuni Espejo Infinito', desc: 'Pasarela de cristal sobre espejo de sal y cielo galáctico, vestidos espejo líquido y electro-andino.' },
+    { id: 'mundo3', num: 3, url: 'https://wordmodelbolivia3.modelsoft.sbs/', name: 'La Paz • Cielo 3600 & Teleférico Neón', desc: 'Pasarela aérea entre cabinas del teleférico, Illimani boreal y couture aguayo metálico 24K.' },
+    { id: 'mundo4', num: 4, url: 'https://wordmodelbolivia4.modelsoft.sbs/', name: 'Oruro • Carnaval Imperial de Oro y Fuego', desc: 'Avenida Cívica con arcos de fuego frío, alas metálicas de fantasía y Diablada/Morenada sinfónica.' },
+    { id: 'mundo5', num: 5, url: 'https://wordmodelbolivia5.modelsoft.sbs/', name: 'Cochabamba • Cristo de la Concordia Cristal', desc: 'Jardines flotantes de jacarandás luminosos, fuentes musicales y alta costura primavera real.' },
+    { id: 'mundo6', num: 6, url: 'https://wordmodelbolivia6.modelsoft.sbs/', name: 'Chuquisaca • Sucre Palacio Blanco 24K', desc: 'Pasarela de mármol entre arcos coloniales, candelabros flotantes y cine editorial dorado.' },
+    { id: 'mundo7', num: 7, url: 'https://wordmodelbolivia7.modelsoft.sbs/', name: 'Tarija • Viñedos Dorados al Atardecer', desc: 'Pasarela sobre viñedos con faroles flotantes, couture chapaca en terciopelo vino y oro.' },
+    { id: 'mundo8', num: 8, url: 'https://wordmodelbolivia8.modelsoft.sbs/', name: 'Beni • Amazonía Esmeralda & Río Mamoré', desc: 'Pasarela flotante luminosa sobre el río, victorias regias gigantes y plumas iridiscentes.' },
+    { id: 'mundo9', num: 9, url: 'https://wordmodelbolivia9.modelsoft.sbs/', name: 'Pando • Selva de Diamante & Cascada Luz', desc: 'Pasarela de cristal frente a cascada láser esmeralda, lianas luminosas y couture líquida.' },
+    { id: 'mundo10', num: 10, url: 'https://wordmodelbolivia10.modelsoft.sbs/', name: 'LAGO TITICACA • TEMPLO CÓSMICO (Final)', desc: 'Templo solar flotante, anillos planetarios, tributo a los 9 departamentos y Director Supremo.' }
+  ];
+  // sagaRemoteLinks inicializado arriba y sincronizado en vivo desde subscribePublicGameConfig()
+  function renderSagaModal() {
+    const grid = document.getElementById('saga-worlds-grid');
+    const sum = document.getElementById('saga-progress-summary');
+    if (!grid) return;
+    const clearedCnt = state.cleared.filter(Boolean).length;
+    const w1Done = clearedCnt >= STAGES.length;
+    if (sum) {
+      sum.textContent = w1Done
+        ? '👑 ¡Mundo 1 completado (5/5)! Tu cuenta Firebase está lista para continuar hacia Mundo 2.'
+        : `Mundo 1 en progreso (${clearedCnt}/5 puertas) • Conquista Santa Cruz para desbloquear el Portal a Mundo 2.`;
+    }
+    grid.innerHTML = '';
+    SAGA_WORLDS.forEach((w) => {
+      const card = document.createElement('div');
+      card.className = 'saga-card' + (w.active ? ' active-world' : '') + (w.num === 10 ? ' world-10' : '');
+      const targetUrl = sagaRemoteLinks[w.id] || w.url || '';
+      let btnHtml = '';
+      if (w.active) {
+        btnHtml = '<button class="saga-go-btn" type="button" data-close-saga="1">✨ JUGANDO AHORA (MUNDO 1)</button>';
+      } else if (targetUrl && (w1Done || hasPanelAccess())) {
+        btnHtml = `<button class="saga-go-btn" type="button" data-saga-url="${targetUrl}">🚀 IR A MUNDO ${w.num}</button>`;
+      } else {
+        btnHtml = `<button class="saga-go-btn" type="button" disabled>🔒 COMPLETA SANTA CRUZ (5/5)</button>`;
+      }
+      card.innerHTML = `<div class="saga-badge">MUNDO ${w.num} / 10${w.num === 10 ? ' • GRAN FINAL' : ''}</div><div class="saga-title">${w.name}</div><div class="saga-desc">${w.desc}</div>${btnHtml}`;
+      grid.appendChild(card);
+    });
+    grid.querySelectorAll('[data-close-saga]').forEach((b) => b.addEventListener('click', () => {
+      document.getElementById('saga-modal').classList.add('hidden');
+    }));
+    grid.querySelectorAll('[data-saga-url]').forEach((b) => b.addEventListener('click', () => {
+      const u = b.getAttribute('data-saga-url');
+      if (u && /^https?:\/\//i.test(u)) window.location.href = u;
+    }));
+  }
+  function openSagaModal() {
+    if (database) {
+      database.ref(DB_NAMESPACE + '/settings/sagaLinks').once('value').then((snap) => {
+        if (snap.exists() && snap.val()) sagaRemoteLinks = snap.val();
+        renderSagaModal();
+      }).catch(() => renderSagaModal());
+    } else {
+      renderSagaModal();
+    }
+    document.getElementById('saga-modal').classList.remove('hidden');
+  }
+  const btnSagaMap = document.getElementById('btn-saga-map');
+  if (btnSagaMap) btnSagaMap.addEventListener('click', openSagaModal);
+  const btnCloseSaga = document.getElementById('btn-close-saga');
+  if (btnCloseSaga) btnCloseSaga.addEventListener('click', () => document.getElementById('saga-modal').classList.add('hidden'));
+  function clearSagaRedirectTimer() {
+    if (window.__sagaRedirectInterval) {
+      clearInterval(window.__sagaRedirectInterval);
+      window.__sagaRedirectInterval = null;
+    }
+  }
+  const btnResSaga = document.getElementById('btn-res-saga');
+  if (btnResSaga) btnResSaga.addEventListener('click', () => {
+    clearSagaRedirectTimer();
+    document.getElementById('result-modal').classList.add('hidden');
+    openSagaModal();
+  });
   let mvFxIndex = 0;
   const btnMvFx = document.getElementById('btn-mv-fx');
   if (btnMvFx) {
@@ -1764,7 +1932,15 @@
         stick: trackSharedGeo(new THREE.CylinderGeometry(0.015, 0.018, 0.95, 5)),
         flag: trackSharedGeo(new THREE.PlaneGeometry(0.56, 0.34)),
         bunting: trackSharedGeo(new THREE.ConeGeometry(0.26, 0.46, 3)),
-        confetti: trackSharedGeo(new THREE.PlaneGeometry(0.16, 0.10))
+        confetti: trackSharedGeo(new THREE.PlaneGeometry(0.16, 0.10)),
+        pillar: trackSharedGeo(new THREE.BoxGeometry(0.28, 5.2, 0.28)),
+        trussTop: trackSharedGeo(new THREE.BoxGeometry(9.6, 0.24, 0.24)),
+        trussLeg: trackSharedGeo(new THREE.BoxGeometry(0.22, 6.2, 0.22)),
+        lamp: trackSharedGeo(new THREE.CylinderGeometry(0.14, 0.20, 0.28, 8)),
+        bench: trackSharedGeo(new THREE.BoxGeometry(0.95, 0.42, 11.2)),
+        tripod: trackSharedGeo(new THREE.CylinderGeometry(0.04, 0.16, 1.25, 6)),
+        camBody: trackSharedGeo(new THREE.BoxGeometry(0.32, 0.22, 0.28)),
+        flashBulb: trackSharedGeo(new THREE.SphereGeometry(0.10, 8, 6))
       },
       mat: {
         skins: [0xf0bc98, 0xe5aa84, 0xd99b72, 0xf3c6a8].map((c) => trackSharedMat(new THREE.MeshLambertMaterial({ color: c }))),
@@ -1780,7 +1956,11 @@
         flagBol: trackSharedMat(new THREE.MeshBasicMaterial({ map: getFlagTexture('bolivia'), side: THREE.DoubleSide })),
         flagScz: trackSharedMat(new THREE.MeshBasicMaterial({ map: getFlagTexture('scz'), side: THREE.DoubleSide })),
         buntingCols: [0xd52b1e, 0xf9e300, 0x007934, 0xffffff, 0x007934, 0xf472b6].map((c) => trackSharedMat(new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }))),
-        confCols: [0xfacc15, 0x34d399, 0xf472b6, 0xd52b1e, 0xffffff, 0x38bdf8].map((c) => trackSharedMat(new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide })))
+        confCols: [0xfacc15, 0x34d399, 0xf472b6, 0xd52b1e, 0xffffff, 0x38bdf8].map((c) => trackSharedMat(new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide }))),
+        truss: trackSharedMat(new THREE.MeshLambertMaterial({ color: 0x1e293b })),
+        lamp: trackSharedMat(new THREE.MeshBasicMaterial({ color: 0xfef08a })),
+        bench: trackSharedMat(new THREE.MeshLambertMaterial({ color: 0x1e1b2e })),
+        cam: trackSharedMat(new THREE.MeshLambertMaterial({ color: 0x0f172a }))
       }
     };
     return festiveCache;
@@ -3290,7 +3470,33 @@
     g.add(createFestiveBunting(-7.5, 6.4, -7.5, 7.5, 6.4, -7.5, 14));
     g.add(createFestiveBunting(-7.0, 5.0, -14.0, 7.0, 5.0, -14.0, 12));
 
-    mapRefs = { player, doorObjs, obstacles, pointer, palmCrowns, flags, crowd: mapCrowd };
+    // Portal Dorado Interdimensional de la Saga (Camino hacia los Mundos 2-10)
+    const sagaPortal = new THREE.Group();
+    sagaPortal.position.set(0, 0, 17.5);
+    const pRingOuter = new THREE.Mesh(
+      new THREE.TorusGeometry(2.35, 0.14, 12, 36),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+    );
+    pRingOuter.position.y = 2.6;
+    const pRingInner = new THREE.Mesh(
+      new THREE.TorusGeometry(1.85, 0.08, 10, 32),
+      new THREE.MeshBasicMaterial({ color: 0x34d399 })
+    );
+    pRingInner.position.y = 2.6;
+    const pCore = new THREE.Mesh(
+      new THREE.CircleGeometry(1.75, 28),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.24, side: THREE.DoubleSide })
+    );
+    pCore.position.y = 2.6;
+    const pBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.6, 2.9, 0.28, 24),
+      new THREE.MeshLambertMaterial({ color: 0x1e293b })
+    );
+    pBase.position.y = 0.14;
+    sagaPortal.add(pRingOuter, pRingInner, pCore, pBase);
+    g.add(sagaPortal);
+
+    mapRefs = { player, doorObjs, obstacles, pointer, palmCrowns, flags, crowd: mapCrowd, sagaPortal, pRingInner };
   }
 
   // =========================================================================
@@ -3439,20 +3645,20 @@
     ledWall.position.set(0, 2.85, -8.3);
     g.add(ledWall);
 
-    // Columnas LED verticales flanqueando la entrada de pasarela
-    const pillarGeo = trackSharedGeo(new THREE.BoxGeometry(0.28, 5.2, 0.28));
+    // Columnas LED verticales flanqueando la entrada de pasarela (geometrías/materiales cacheados sin fuga GPU)
+    const fcArena = getFestiveCache();
     [-5.0, -2.5, 2.5, 5.0].forEach((px) => {
-      const pil = new THREE.Mesh(pillarGeo, ledEdgeMat);
+      const pil = new THREE.Mesh(fcArena.geo.pillar, ledEdgeMat);
       pil.position.set(px, 2.6, -7.4);
       g.add(pil);
     });
 
     // === 2. ESTRUCTURA SUPERIOR DE LUCES (TRUSS DE PASARELA REAL) ===
-    const trussMat = trackSharedMat(new THREE.MeshLambertMaterial({ color: 0x1e293b }));
-    const trussTopGeo = trackSharedGeo(new THREE.BoxGeometry(9.6, 0.24, 0.24));
-    const trussLegGeo = trackSharedGeo(new THREE.BoxGeometry(0.22, 6.2, 0.22));
-    const lampGeo = trackSharedGeo(new THREE.CylinderGeometry(0.14, 0.20, 0.28, 8));
-    const lampMat = trackSharedMat(new THREE.MeshBasicMaterial({ color: 0xfef08a }));
+    const trussMat = fcArena.mat.truss;
+    const trussTopGeo = fcArena.geo.trussTop;
+    const trussLegGeo = fcArena.geo.trussLeg;
+    const lampGeo = fcArena.geo.lamp;
+    const lampMat = fcArena.mat.lamp;
     [-4.6, 1.2].forEach((tz) => {
       const bar = new THREE.Mesh(trussTopGeo, trussMat);
       bar.position.set(0, 5.8, tz);
@@ -3504,8 +3710,8 @@
     });
 
     // === 4. PALCOS VIP LATERALES + PRIMERA FILA DE PASARELA (FRONT ROW) ===
-    const benchGeo = trackSharedGeo(new THREE.BoxGeometry(0.95, 0.42, 11.2));
-    const benchMat = trackSharedMat(new THREE.MeshLambertMaterial({ color: 0x1e1b2e }));
+    const benchGeo = fcArena.geo.bench;
+    const benchMat = fcArena.mat.bench;
     [-4.1, 4.1].forEach((bx) => {
       const bench = new THREE.Mesh(benchGeo, benchMat);
       bench.position.set(bx, -0.24, -0.4);
@@ -3513,10 +3719,10 @@
     });
 
     // Zona de Prensa / Paparazzi al frente de la pasarela con flashes reales
-    const tripodGeo = trackSharedGeo(new THREE.CylinderGeometry(0.04, 0.16, 1.25, 6));
-    const camBodyGeo = trackSharedGeo(new THREE.BoxGeometry(0.32, 0.22, 0.28));
-    const camMat = trackSharedMat(new THREE.MeshLambertMaterial({ color: 0x0f172a }));
-    const flashBulbGeo = trackSharedGeo(new THREE.SphereGeometry(0.10, 8, 6));
+    const tripodGeo = fcArena.geo.tripod;
+    const camBodyGeo = fcArena.geo.camBody;
+    const camMat = fcArena.mat.cam;
+    const flashBulbGeo = fcArena.geo.flashBulb;
     const pressFlashes = [];
     [-1.8, -0.65, 0.65, 1.8].forEach((px) => {
       const trip = new THREE.Mesh(tripodGeo, camMat);
@@ -3652,16 +3858,24 @@
   function spawnBattleBurst(x, colorHex) {
     if (!battleRefs) return;
     let count = 0;
-    for (let i = 0; i < battleRefs.particles.length && count < 7; i++) {
+    for (let i = 0; i < battleRefs.particles.length && count < 10; i++) {
       const p = battleRefs.particles[i];
       if (p.life <= 0) {
         p.mesh.visible = true;
-        p.mesh.material.color.set(colorHex);
-        p.mesh.position.set(x, 1.35, 0.35);
-        p.vx = (Math.random() - 0.5) * 0.14;
-        p.vy = 0.08 + Math.random() * 0.12;
-        p.vz = (Math.random() - 0.5) * 0.14;
-        p.life = 0.55;
+        p.mesh.material.color.set(count >= 6 ? 0xfacc15 : colorHex);
+        if (count >= 6) {
+          const side = (count % 2 === 0) ? -1.85 : 1.85;
+          p.mesh.position.set(side, 0.15, 0.6 + (Math.random() - 0.5) * 1.4);
+          p.vx = side * -0.02 + (Math.random() - 0.5) * 0.04;
+          p.vy = 0.16 + Math.random() * 0.10;
+          p.vz = (Math.random() - 0.5) * 0.05;
+        } else {
+          p.mesh.position.set(x, 1.35, 0.35);
+          p.vx = (Math.random() - 0.5) * 0.14;
+          p.vy = 0.08 + Math.random() * 0.12;
+          p.vz = (Math.random() - 0.5) * 0.14;
+        }
+        p.life = 0.62;
         count++;
       }
     }
@@ -3757,10 +3971,21 @@
     const rivalBeats = buildBeatsTimeline(effBpm, rivalDuration, 1.0);
     const playerBeats = buildBeatsTimeline(effBpm, playerDuration, stage.notesRate);
 
+    const introEl = document.getElementById('mv-intro-banner');
+    if (introEl) {
+      document.getElementById('mv-intro-title').textContent = stage.name.toUpperCase();
+      document.getElementById('mv-intro-sub').textContent = 'VS ' + stage.rival + ' • ' + stage.style;
+      introEl.classList.add('show');
+      setTimeout(() => introEl.classList.remove('show'), 2200);
+    }
+    const covStage = document.getElementById('mv-cover-stage');
+    if (covStage) covStage.textContent = stage.name.toUpperCase() + ' • 24K';
+
     state.battle = {
       stage,
       phase: 'rival', // 'rival' -> 'transition' -> 'player'
       phaseElapsed: 0,
+      introTimer: 2.2,
       rivalDuration,
       playerDuration,
       rivalBeats,
@@ -4094,6 +4319,8 @@
 
     state.mode = 'result';
     document.getElementById('battle-ui').classList.remove('active');
+    const mvOvEnd = document.getElementById('mv-fx-overlay');
+    if (mvOvEnd) mvOvEnd.classList.remove('active');
     document.getElementById('btn-exit-battle').style.display = 'none';
 
     let isGrandFinale = false;
@@ -4117,14 +4344,41 @@
     const btnP = document.getElementById('btn-res-primary');
     const btnS = document.getElementById('btn-res-secondary');
 
+    clearSagaRedirectTimer();
+
     if (isGrandFinale) {
-      document.getElementById('res-kicker').textContent = '👑 VEREDICTO FINAL • CIRCUITO CONQUISTADO';
-      document.getElementById('res-title').textContent = '¡REINA DEL RITMO Y ALTA MODA!';
-      document.getElementById('res-desc').textContent = 'Venciste en ritmo a las 5 modelos desde la Plaza 24 hasta el Cambódromo. Total acumulado: ' + state.totalScore + ' pts.';
-      btnP.textContent = 'NUEVO CIRCUITO DESDE NIVEL 1 🔄';
-      btnP.onclick = resetFullCircuit;
-      btnS.textContent = 'PASEAR POR SANTA CRUZ';
-      btnS.onclick = returnToMap;
+      const publishedMundo2 = (sagaRemoteLinks && typeof sagaRemoteLinks.mundo2 === 'string' && /^https?:\/\//i.test(sagaRemoteLinks.mundo2))
+        ? sagaRemoteLinks.mundo2
+        : '';
+      const nextWorldUrl = publishedMundo2 || 'https://wordmodelbolivia2.modelsoft.sbs/';
+      document.getElementById('res-kicker').textContent = '👑 MUNDO 1 CONQUISTADO (5/5) • PORTAL ABIERTO';
+      document.getElementById('res-title').textContent = '¡REINA DE SANTA CRUZ! RUMBO A UYUNI';
+      const descEl = document.getElementById('res-desc');
+      btnP.textContent = '🚀 VIAJAR A MUNDO 2 (SALAR DE UYUNI)';
+      btnP.onclick = () => {
+        clearSagaRedirectTimer();
+        window.location.href = nextWorldUrl;
+      };
+      btnS.textContent = 'QUEDARME EN SANTA CRUZ';
+      btnS.onclick = () => {
+        clearSagaRedirectTimer();
+        returnToMap();
+      };
+      if (publishedMundo2) {
+        let countdown = 5;
+        descEl.textContent = 'Venciste las 5 batallas de Santa Cruz (' + state.totalScore + ' pts). Enviándote a Mundo 2 en ' + countdown + 's...';
+        window.__sagaRedirectInterval = setInterval(() => {
+          countdown--;
+          if (countdown <= 0) {
+            clearSagaRedirectTimer();
+            window.location.href = publishedMundo2;
+          } else {
+            descEl.textContent = 'Venciste las 5 batallas de Santa Cruz (' + state.totalScore + ' pts). Enviándote a Mundo 2 en ' + countdown + 's...';
+          }
+        }, 1000);
+      } else {
+        descEl.textContent = 'Venciste las 5 batallas de Santa Cruz (' + state.totalScore + ' pts). Tu progreso en Firebase quedó listo para continuar a Mundo 2.';
+      }
     } else if (won) {
       const nextSt = STAGES.find((s) => !state.cleared[s.id]);
       document.getElementById('res-kicker').textContent = 'CONSOLA: MEJOR RITMO (' + pPct + '% VS ' + rPct + '%)';
@@ -4153,6 +4407,7 @@
     }
 
     recordBattleToDB({
+      world: 'mundo1',
       user: currentUser || 'Invitado',
       stageName: stage.name,
       rival: stage.rival,
@@ -4322,8 +4577,9 @@
     if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable)) return;
     const k = e.key.toLowerCase();
     state.keys[k] = true;
-    if (state.mode === 'map' && (k === 'e' || k === 'enter') && state.nearbyDoor && state.level >= state.nearbyDoor.levelReq) {
-      startBattle(state.nearbyDoor);
+    if (state.mode === 'map' && (k === 'e' || k === 'enter') && state.nearbyDoor) {
+      if (state.nearbyDoor === 'SAGA_PORTAL') openSagaModal();
+      else if (state.level >= state.nearbyDoor.levelReq) startBattle(state.nearbyDoor);
     } else if (state.mode === 'battle') {
       const keyMap = { 'a': 0, '1': 0, 's': 1, '2': 1, 'w': 2, '3': 2, 'd': 3, '4': 3, 'q': 4, '5': 4, 'e': 5, '6': 5, 'r': 6, '7': 6, 'f': 7, '8': 7, 'z': 8, '9': 8, 'x': 9, '0': 9, 'c': 10, '-': 10, 'v': 11, '=': 11 };
       if (keyMap[k] !== undefined) handleStepTrigger(keyMap[k]);
@@ -4553,6 +4809,7 @@
   });
 
   async function forceLogoutWithReason(reasonMsg) {
+    clearSagaRedirectTimer();
     audio.stopBeat();
     detachRealtimeListeners();
     if (!reasonMsg && currentUid) {
@@ -4992,7 +5249,9 @@
   });
 
   document.getElementById('btn-enter-door').addEventListener('click', () => {
-    if (state.nearbyDoor && state.level >= state.nearbyDoor.levelReq) {
+    if (state.nearbyDoor === 'SAGA_PORTAL') {
+      openSagaModal();
+    } else if (state.nearbyDoor && state.level >= state.nearbyDoor.levelReq) {
       startBattle(state.nearbyDoor);
     }
   });
@@ -5152,6 +5411,10 @@
       if (mapRefs.crowd) {
         animateSpectatorCrowd(mapRefs.crowd, animTime, 108, 1.0, state.playerPos);
       }
+      if (mapRefs.pRingInner) {
+        mapRefs.pRingInner.rotation.z = animTime * 1.3;
+        mapRefs.pRingInner.rotation.y = Math.sin(animTime * 0.9) * 0.4;
+      }
     }
 
     if (state.mode === 'title' && mapRefs) {
@@ -5222,6 +5485,7 @@
         if (dist < 4.5) foundDoor = dObj.stage;
       });
 
+      const nearPortal = mapRefs.sagaPortal && Math.hypot(state.playerPos.x - 0, state.playerPos.z - 17.5) < 4.5;
       const promptEl = document.getElementById('door-prompt');
       if (foundDoor) {
         if (state.nearbyDoor !== foundDoor) {
@@ -5234,6 +5498,19 @@
           const btn = document.getElementById('btn-enter-door');
           btn.disabled = !unlocked;
           btn.textContent = unlocked ? 'ENTRAR A LA PASARELA ✨' : 'REQUIERE NIVEL ' + foundDoor.levelReq;
+        }
+        promptEl.classList.add('visible');
+      } else if (nearPortal) {
+        if (state.nearbyDoor !== 'SAGA_PORTAL') {
+          state.nearbyDoor = 'SAGA_PORTAL';
+          const cnt = state.cleared.filter(Boolean).length;
+          document.getElementById('door-prompt-title').textContent = '🌍 PORTAL DE LA SAGA • 10 MUNDOS BOLIVIA';
+          document.getElementById('door-prompt-sub').textContent = cnt >= STAGES.length
+            ? '👑 ¡Santa Cruz conquistado (5/5)! Listo para viajar a Mundo 2: Salar de Uyuni.'
+            : ('Progreso Santa Cruz: ' + cnt + '/5 batallas vencidas • Abre el mapa de los 10 mundos');
+          const btn = document.getElementById('btn-enter-door');
+          btn.disabled = false;
+          btn.textContent = 'ABRIR PORTAL DE LA SAGA 🌍';
         }
         promptEl.classList.add('visible');
       } else {
@@ -5374,7 +5651,8 @@
       const mvBeatFrac = mvBeatPos - Math.floor(mvBeatPos);
       const mvPulse = Math.pow(Math.max(0, 1 - mvBeatFrac * 2.5), 2);
       const mvCut = Math.floor(mvBeatPos / 4) % 4;
-      const autoCycle = ['split', 'triptych', 'cinema219', 'glam360', 'neon'];
+      const autoCycle = ['split', 'triptych', 'cinema219', 'glam360', 'neon', 'cover'];
+      if (b.introTimer > 0) b.introTimer = Math.max(0, b.introTimer - dt);
       const selectedMode = MV_FX_MODES[mvFxIndex].id;
       const activeMvMode = (selectedMode === 'auto')
         ? autoCycle[Math.floor(mvBeatPos / 8) % autoCycle.length]
@@ -5435,6 +5713,9 @@
         } else if (activeMvMode === 'glam360') {
           mvCamALabel.innerHTML = '<span class="mv-cam-dot"></span>ÓRBITA GLAMOUR 360°';
           mvCamBLabel.style.display = 'none';
+        } else if (activeMvMode === 'cover') {
+          mvCamALabel.innerHTML = '<span class="mv-cam-dot"></span>PORTADA EDITORIAL EN VIVO';
+          mvCamBLabel.style.display = 'none';
         } else {
           mvCamALabel.innerHTML = '<span class="mv-cam-dot"></span>NEÓN CONCIERTO VIP';
           mvCamBLabel.style.display = 'none';
@@ -5446,7 +5727,18 @@
       const my = activeModel.root.position.y + activeModel.rig.position.y;
       const mz = activeModel.root.position.z + activeModel.rig.position.z;
 
-      if (activeMvMode === 'cinema219') {
+      if (b.introTimer > 0) {
+        const k = b.introTimer / 2.2;
+        camera.position.set(mx + Math.sin(k * Math.PI) * 2.2, my + 1.55 + k * 2.6, mz + 3.4 + k * 5.2);
+        camera.fov = 46;
+        camera.lookAt(mx, my + 1.25, mz);
+      } else if (activeMvMode === 'cover') {
+        camera.position.x += (mx + Math.sin(animTime * 0.9) * 0.35 - camera.position.x) * 0.12;
+        camera.position.y += (my + 1.46 - camera.position.y) * 0.12;
+        camera.position.z += (mz + 2.45 - camera.position.z) * 0.12;
+        camera.fov = 38 - mvPulse * 2.4;
+        camera.lookAt(mx, my + 1.38, mz);
+      } else if (activeMvMode === 'cinema219') {
         const dolly = Math.sin(animTime * 0.55) * 2.2;
         camera.position.x += (mx + dolly - camera.position.x) * 0.08;
         camera.position.y += (my + 1.65 - camera.position.y) * 0.08;
